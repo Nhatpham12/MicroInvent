@@ -1,0 +1,31 @@
+sequenceDiagram
+  autonumber
+  actor TK as Thủ kho
+  participant FE as React App
+  participant GW as API Gateway
+  participant ORD as order-service
+  participant INV as inventory-service
+  participant MQ as RabbitMQ
+  participant REP as report-service
+  TK->>FE: Tạo phiếu xuất (kho HN01)
+  FE->>GW: POST /api/v1/export-slips (JWT, X-Warehouse-Id)
+  GW->>ORD: forward + user context
+  ORD->>INV: POST /internal/stock/check (SP, kho)
+  INV-->>ORD: tồn khả dụng + tồn các kho khác
+  alt Không đủ hàng
+    ORD-->>FE: 409 + gợi ý kho khác (tách phiếu / chuyển kho)
+  else Đủ hàng
+    ORD->>INV: POST /internal/stock/reserve (Idempotency-Key)
+    INV-->>ORD: hold_id (trừ tồn khả dụng)
+    ORD-->>FE: 201 PXK PENDING
+  end
+  TK->>FE: Xác nhận xuất
+  FE->>GW: POST /api/v1/export-slips/:id/export
+  GW->>ORD: forward
+  ORD->>INV: POST /internal/stock/commit (hold_id) — transaction + version check
+  INV-->>ORD: OK (trừ tồn thực, ghi stock_movements)
+  ORD->>ORD: status=EXPORTED + outbox(export.exported)
+  ORD-)MQ: export.exported
+  INV-)MQ: stock.changed / stock.low
+  MQ-)REP: cập nhật fact_sales, tạo cảnh báo
+  REP-)FE: Socket.IO notification:new

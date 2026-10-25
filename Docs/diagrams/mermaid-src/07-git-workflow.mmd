@@ -1,0 +1,35 @@
+gitGraph
+  commit id: "init monorepo"
+  branch develop
+  checkout develop
+  commit id: "docker-compose + CI"
+  branch feature/auth-login
+  checkout feature/auth-login
+  commit id: "feat(auth): login JWT"
+  commit id: "test(auth): login"
+  checkout develop
+  merge feature/auth-login id: "PR #1 squash"
+  branch feature/fe-layout
+  checkout feature/fe-layout
+  commit id: "feat(fe): layout + router"
+  checkout develop
+  branch feature/inventory-stock
+  checkout feature/inventory-stock
+  commit id: "feat(inventory): stock balances"
+  checkout develop
+  merge feature/fe-layout id: "PR #2"
+  merge feature/inventory-stock id: "PR #3"
+  branch release/v0.1
+  checkout release/v0.1
+  commit id: "chore: bump v0.1.0"
+  checkout main
+  merge release/v0.1 tag: "v0.1.0 (Sprint 1)"
+  checkout develop
+  merge release/v0.1
+  checkout main
+  branch hotfix/login-lock
+  commit id: "fix(auth): lock 5 phút"
+  checkout main
+  merge hotfix/login-lock tag: "v0.1.1"
+  checkout develop
+  merge hotfix/login-lock

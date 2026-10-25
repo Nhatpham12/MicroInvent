@@ -1,0 +1,47 @@
+erDiagram
+  product_groups ||--o{ products : "chứa"
+  product_groups {
+    int id PK
+    varchar code UK
+    varchar name UK
+    bool is_deleted
+  }
+  products {
+    int id PK
+    int group_id FK
+    varchar code UK
+    varchar name
+    varchar unit
+    decimal default_price_in
+    decimal default_price_out
+    decimal default_rent_price_per_day
+    int min_stock
+    bool has_serial
+    int warranty_months
+    varchar image_url
+    bool is_deleted
+  }
+  suppliers {
+    int id PK
+    varchar code UK
+    varchar name
+    varchar tax_code UK
+    varchar address
+    varchar phone_fax
+    varchar email
+    varbinary bank_account_no "mã hóa"
+    varchar bank_account_name
+    varchar bank_name
+  }
+  customers {
+    int id PK
+    varchar code UK
+    varchar name
+    enum customer_type "RETAIL|BUSINESS"
+    varchar tax_code
+    varbinary id_card_no "mã hóa"
+    varchar address
+    varchar phone
+    varchar email
+ 
+  }

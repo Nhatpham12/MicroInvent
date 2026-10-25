@@ -1,0 +1,97 @@
+erDiagram
+  warehouses ||--o{ warehouse_locations : "có vị trí"
+  warehouses ||--o{ product_warehouse_settings : "ngưỡng tồn"
+  warehouses ||--o{ stock_balances : "tồn theo SP"
+  warehouses ||--o{ stock_items : "chứa serial"
+  warehouse_locations ||--o{ stock_items : ""
+  warehouses ||--o{ stock_holds : ""
+  stock_items ||--o{ stock_holds : ""
+  warehouses ||--o{ stock_movements : ""
+  stock_items ||--o{ stock_movements : ""
+  warehouses ||--o{ stocktakes : ""
+  stocktakes ||--|{ stocktake_items : ""
+  warehouses {
+    int id PK
+    varchar code UK
+    varchar name
+    enum type "MAIN|BRANCH|WARRANTY|DAMAGED"
+    varchar address
+    int manager_user_id "ref auth.users"
+    enum status "ACTIVE|SUSPENDED|CLOSED"
+    bool is_default
+    bool is_stocktake_locked
+  }
+  warehouse_locations {
+    int id PK
+    int warehouse_id FK
+    varchar code "UK theo kho"
+  }
+  product_warehouse_settings {
+    int product_id PK "ref catalog.products"
+    int warehouse_id PK,FK
+    int min_stock
+  }
+  stock_balances {
+    bigint id PK
+    int product_id "UK(product,warehouse)"
+    int warehouse_id FK
+    int qty_on_hand
+    int qty_hold
+    int qty_damaged
+    int qty_in_transit_in
+    int qty_rented_loaned
+    decimal avg_cost
+    int version "optimistic lock"
+  }
+  stock_items {
+    bigint id PK
+    int product_id
+    int warehouse_id FK "NULL khi đang chuyển/đã bán"
+    int location_id FK
+    varchar serial UK
+    enum status "AVAILABLE|HOLD|IN_TRANSIT|RENTED|LOANED|SOLD|DAMAGED"
+    decimal cost_price
+    int supplier_id
+    int version
+  }
+  stock_holds {
+    bigint id PK
+    int product_id
+    int warehouse_id FK
+    bigint stock_item_id FK
+    int qty
+    int customer_id
+    int held_by_user_id
+    enum status "ACTIVE|RELEASED|CONSUMED|EXPIRED"
+    datetime expires_at
+  }
+  stock_movements {
+    bigint id PK
+    int product_id
+    int warehouse_id FK
+    bigint stock_item_id FK
+    enum movement_type
+    enum ref_type
+    int ref_id
+    int qty_change
+    int qty_before
+    int qty_after
+    int user_id
+  }
+  stocktakes {
+    int id PK
+    varchar code UK
+    int warehouse_id FK
+    enum status
+    bool lock_transactions
+    int approved_by
+  }
+  stocktake_items {
+    bigint id PK
+    int stocktake_id FK
+    int product_id
+    int system_qty
+    int actual_qty
+    int diff_qty "generated"
+ 
+  }

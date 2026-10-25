@@ -1,0 +1,68 @@
+erDiagram
+  notifications {
+    bigint id PK
+    int user_id
+    int warehouse_id
+    enum type "LOW_STOCK|RENT_DUE|TRANSFER_OVERDUE|..."
+    varchar title
+    bool is_read
+    bool is_resolved
+  }
+  audit_logs {
+    bigint id PK
+    int user_id
+    int warehouse_id
+    varchar service
+    varchar action
+    varchar entity
+    json before_data
+    json after_data
+  }
+  fact_sales {
+    bigint id PK
+    date sale_date
+    int warehouse_id
+    int product_id
+    int customer_id
+    int sales_user_id
+    enum source_type
+    int qty
+    decimal revenue
+    decimal cost
+  }
+  fact_stock_movements {
+    bigint id PK
+    date movement_date
+    int warehouse_id
+    int product_id
+    varchar movement_type
+    int qty
+    decimal value
+  }
+  stock_snapshots {
+    date snapshot_date PK
+    int warehouse_id PK
+    int product_id PK
+    int qty_on_hand
+    int qty_available
+    decimal stock_value
+  }
+  export_jobs {
+    bigint id PK
+    varchar report_type
+    json params
+    enum format "XLSX|PDF|DOCX|XML"
+    enum status
+    varchar file_url
+  }
+  backup_logs {
+    bigint id PK
+    enum trigger_type
+    enum status
+    varchar file_path
+  }
+  processed_events {
+    varchar event_id PK
+    datetime processed_at
+ 
+  }

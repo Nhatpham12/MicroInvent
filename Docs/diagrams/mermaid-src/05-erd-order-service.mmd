@@ -1,0 +1,164 @@
+erDiagram
+  goods_receipts ||--|{ goods_receipt_items : ""
+  export_slips ||--|{ export_slip_items : ""
+  export_slips |o--o{ export_slips : "tách phiếu"
+  rental_contracts ||--|{ rental_items : ""
+  rental_contracts ||--o{ rental_returns : ""
+  rental_returns ||--|{ rental_return_items : ""
+  rental_items ||--o{ rental_return_items : ""
+  export_slips ||--o{ sales_returns : "đổi/trả"
+  sales_returns ||--|{ sales_return_items : ""
+  export_slip_items ||--o{ sales_return_items : ""
+  stock_transfers ||--|{ stock_transfer_items : ""
+  stock_transfers ||--o{ transfer_discrepancies : ""
+  stock_transfer_items ||--o{ transfer_discrepancies : ""
+  goods_receipts {
+    int id PK
+    varchar code UK "PNK-2026-0001"
+    int warehouse_id "kho nhận"
+    int supplier_id
+    json partner_snapshot
+    enum status "DRAFT|CONFIRMED|CANCELLED"
+    varchar contract_no
+    varchar tracking_no
+    enum vat_rate
+    decimal total_amount
+    decimal paid_amount
+    enum payment_status
+  }
+  goods_receipt_items {
+    bigint id PK
+    int receipt_id FK
+    int product_id
+    int qty
+    decimal unit_price
+    json serials
+  }
+  export_slips {
+    int id PK
+    varchar code UK "PXK-"
+    enum export_type "SALE|DAMAGED|WARRANTY|..."
+    int warehouse_id "kho xuất"
+    int customer_id
+    enum status "PENDING|CONFIRMED|EXPORTED|CANCELLED"
+    decimal total_amount
+    decimal deposit_amount
+    decimal paid_amount
+    enum payment_status
+    date due_date
+    int sales_user_id
+    int split_from_id FK
+  }
+  export_slip_items {
+    bigint id PK
+    int slip_id FK
+    int product_id
+    int qty
+    decimal unit_price
+    decimal unit_cost
+    json serials
+    date warranty_until
+  }
+  rental_contracts {
+    int id PK
+    varchar code UK
+    enum rental_type "RENT|LOAN"
+    int warehouse_id
+    int customer_id
+    date start_date
+    date due_date
+    enum status
+    decimal deposit_amount
+    decimal total_rent
+    decimal penalty_amount
+  }
+  rental_items {
+    bigint id PK
+    int contract_id FK
+    int product_id
+    int qty
+    int returned_qty
+    decimal daily_rate
+    json serials
+  }
+  rental_returns {
+    int id PK
+    int contract_id FK
+    int return_warehouse_id "có thể khác kho xuất"
+    int overdue_days
+    decimal penalty_amount
+  }
+  rental_return_items {
+    bigint id PK
+    int return_id FK
+    bigint rental_item_id FK
+    int qty
+    enum item_condition
+  }
+  sales_returns {
+    int id PK
+    varchar code UK
+    int export_slip_id FK
+    int return_warehouse_id
+    enum return_type
+    int days_since_delivery
+    decimal fee_rate
+    decimal fee_amount
+    int new_export_slip_id FK
+  }
+  sales_return_items {
+    bigint id PK
+    int return_id FK
+    bigint export_item_id FK
+    int qty
+    enum item_condition
+  }
+  stock_transfers {
+    int id PK
+    varchar code UK "PCK-"
+    int from_warehouse_id
+    int to_warehouse_id
+    enum status "DRAFT..COMPLETED|CANCELLED"
+    int approved_by
+    datetime shipped_at
+    date expected_date
+    datetime received_at
+    enum shipping_method
+    decimal shipping_cost
+  }
+  stock_transfer_items {
+    bigint id PK
+    int transfer_id FK
+    int product_id
+    int qty_sent
+    int qty_received
+    json serials_sent
+    json serials_received
+  }
+  transfer_discrepancies {
+    int id PK
+    int transfer_id FK
+    bigint transfer_item_id FK
+    int qty_diff
+    enum resolution "PENDING|RESEND|LOSS|RETURN_TO_SOURCE"
+  }
+  payments {
+    bigint id PK
+    enum ref_type
+    int ref_id
+    enum direction "IN|OUT"
+    decimal amount
+    enum method
+  }
+  outbox_events {
+    bigint id PK
+    varchar event_type
+    json payload
+    enum status
+  }
+  doc_sequences {
+    varchar prefix PK
+    int year PK
+    int last_no
+ 
+  }

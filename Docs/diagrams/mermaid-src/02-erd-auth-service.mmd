@@ -1,0 +1,65 @@
+erDiagram
+  roles ||--o{ users : "has"
+  roles ||--o{ role_permissions : ""
+  permissions ||--o{ role_permissions : ""
+  users ||--o{ user_warehouses : "được gán kho"
+  users ||--o{ refresh_tokens : ""
+  users ||--o{ password_otps : ""
+  users ||--o{ login_histories : ""
+  roles {
+    int id PK
+    varchar code UK "ADMIN|MANAGER|ACCOUNTANT|STOREKEEPER|SALES"
+    varchar name
+    bool all_warehouses
+  }
+  permissions {
+    int id PK
+    varchar code UK
+    varchar description
+  }
+  role_permissions {
+    int role_id PK,FK
+    int permission_id PK,FK
+  }
+  users {
+    int id PK
+    varchar username UK
+    varchar email UK
+    varchar password_hash
+    varchar full_name
+    int role_id FK
+    int default_warehouse_id "ref inventory.warehouses"
+    bool is_active
+    int failed_login_count
+    datetime locked_until
+  }
+  user_warehouses {
+    int user_id PK,FK
+    int warehouse_id PK "ref inventory.warehouses"
+    bool can_write
+  }
+  refresh_tokens {
+    bigint id PK
+    int user_id FK
+    varchar token_hash UK
+    datetime expires_at
+    datetime revoked_at
+  }
+  password_otps {
+    bigint id PK
+    int user_id FK
+    varchar otp_hash
+    int attempts
+    datetime expires_at
+  }
+  login_histories {
+    bigint id PK
+    int user_id FK
+    bool success
+    varchar ip_address
+  }
+  system_settings {
+    varchar setting_key PK
+    varchar setting_value
+ 
+  }
