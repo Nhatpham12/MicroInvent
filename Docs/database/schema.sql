@@ -2,6 +2,16 @@
 --  ĐỒ ÁN INVENTORY MICROSERVICE (tên tạm) – THIẾT KẾ CSDL
 --  Dựa trên SRS TigerNet v1.1 (mục 6), viết lại theo mô hình
 --  "database per service" – MySQL 8.0, utf8mb4.
+--  Backend: Java 21 + Spring Boot 3.3 (Spring Data JPA / Hibernate 6).
+--  Cách dùng: mỗi service tách phần DDL của database mình thành
+--    src/main/resources/db/migration/V1__init.sql (Flyway), seed -> V2__seed.sql;
+--    spring.jpa.hibernate.ddl-auto=validate.
+--  Mapping JPA gợi ý:
+--    ENUM            -> @Enumerated(EnumType.STRING)
+--    JSON            -> @JdbcTypeCode(SqlTypes.JSON) (List<String>, Map...)
+--    version         -> @Version (optimistic locking)
+--    created_at/updated_at -> @CreationTimestamp / @UpdateTimestamp
+--    VARBINARY mã hóa -> AttributeConverter AES-256
 --
 --  Nguyên tắc:
 --   * Mỗi service sở hữu 1 database riêng, KHÔNG có FK chéo database.

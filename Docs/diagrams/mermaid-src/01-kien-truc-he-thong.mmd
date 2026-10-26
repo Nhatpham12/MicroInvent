@@ -2,32 +2,36 @@ flowchart TB
   subgraph Client["Client"]
     FE["React + Vite SPA<br/>Ant Design · TanStack Query · Zustand"]
   end
-  FE -- "HTTPS REST /api/v1<br/>WebSocket (Socket.IO)" --> GW
-  subgraph Edge["Edge"]
-    GW["API Gateway :8080<br/>Express + http-proxy-middleware<br/>JWT verify · Rate limit · CORS · Swagger"]
+  FE -- "HTTPS REST /api/v1<br/>WebSocket STOMP /ws" --> GW
+  subgraph Edge["Edge (Spring Cloud)"]
+    GW["api-gateway :8080<br/>Spring Cloud Gateway<br/>JWT filter · RequestRateLimiter · CORS · Swagger UI"]
+    EU["discovery-server :8761<br/>Eureka"]
   end
-  GW --> AUTH["auth-service :4001<br/>Đăng nhập · OTP · Users · Phân quyền kho · Settings"]
-  GW --> CAT["catalog-service :4002<br/>Sản phẩm · Nhóm SP · NCC · Khách hàng"]
-  GW --> INV["inventory-service :4003<br/>Kho · Tồn kho · Serial · Giữ hàng · Kiểm kê"]
-  GW --> ORD["order-service :4004<br/>Nhập · Xuất · Thuê/Mượn · Đổi trả · Chuyển kho · Công nợ"]
-  GW --> REP["report-service :4005<br/>Báo cáo · Cảnh báo · Audit log · Xuất file · Backup"]
-  ORD -- "REST nội bộ (Idempotency-Key)<br/>reserve / commit / release" --> INV
-  ORD -. "REST nội bộ: lấy SP/KH" .-> CAT
-  INV -. "lấy scope kho" .-> AUTH
-  subgraph Bus["RabbitMQ (topic exchange: inventory.events)"]
+  GW -. "lb://service" .-> EU
+  GW --> AUTH["auth-service :8081<br/>Spring Security · JWT · OTP · Users · Phân quyền kho"]
+  GW --> CAT["catalog-service :8082<br/>Sản phẩm · Nhóm SP · NCC · Khách hàng"]
+  GW --> INV["inventory-service :8083<br/>Kho · Tồn kho · Serial · Giữ hàng · Kiểm kê"]
+  GW --> ORD["order-service :8084<br/>Nhập · Xuất · Thuê/Mượn · Đổi trả · Chuyển kho · Công nợ"]
+  GW --> REP["report-service :8085<br/>Báo cáo · Cảnh báo · Audit · Xuất Excel/PDF · Backup"]
+  ORD -- "OpenFeign + Resilience4j<br/>reserve / commit / release (Idempotency-Key)" --> INV
+  ORD -. "OpenFeign: lấy SP/KH" .-> CAT
+  INV -. "OpenFeign: scope kho" .-> AUTH
+  subgraph Bus["RabbitMQ – Spring AMQP (topic exchange: inventory.events)"]
     MQ(("events"))
   end
   ORD -- "receipt.confirmed · export.exported<br/>transfer.* · rental.* · return.*" --> MQ
   INV -- "stock.changed · stock.low · hold.expired" --> MQ
   AUTH -- "user.* · audit" --> MQ
   CAT -- "product.* · audit" --> MQ
-  MQ --> REP
+  MQ -- "@RabbitListener" --> REP
   AUTH --- DB1[("auth_db")]
   CAT --- DB2[("catalog_db")]
   INV --- DB3[("inventory_db")]
   ORD --- DB4[("order_db")]
   REP --- DB5[("report_db")]
-  REDIS[("Redis<br/>cache · lock tồn · rate limit · OTP")]
+  REDIS[("Redis<br/>cache · Redisson lock · rate limit · OTP")]
   GW --- REDIS
   INV --- REDIS
   AUTH --- REDIS
+  ZIP["Zipkin<br/>Micrometer Tracing"]
+  REP -.-> ZIP
