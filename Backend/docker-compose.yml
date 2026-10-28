@@ -1,0 +1,214 @@
+# Chạy hạ tầng:      docker compose up -d mysql redis rabbitmq mailpit
+# Chạy toàn bộ:      docker compose up -d --build
+name: microinvent
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      TZ: Asia/Ho_Chi_Minh
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 10s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  discovery-server:
+    build:
+      context: .
+      args:
+        MODULE: platform/discovery-server
+    image: microinvent/discovery-server
+    environment:
+      EUREKA_HOSTNAME: discovery-server
+    ports:
+      - "8761:8761"
+
+  api-gateway:
+    build:
+      context: .
+      args:
+        MODULE: platform/api-gateway
+    image: microinvent/api-gateway
+    env_file: .env
+    depends_on:
+      - discovery-server
+      - redis
+    ports:
+      - "8080:8080"
+
+  tenant-service:
+    build:
+      context: .
+      args:
+        MODULE: services/tenant-service
+    image: microinvent/tenant-service
+    env_file: .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
+    ports:
+      - "8090:8090"
+
+  identity-service:
+    build:
+      context: .
+      args:
+        MODULE: services/identity-service
+    image: microinvent/identity-service
+    env_file: .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+
+  catalog-service:
+    build:
+      context: .
+      args:
+        MODULE: services/catalog-service
+    image: microinvent/catalog-service
+    env_file: .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
+
+  inventory-service:
+    build:
+      context: .
+      args:
+        MODULE: services/inventory-service
+    image: microinvent/inventory-service
+    env_file: .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+
+  procurement-service:
+    build:
+      context: .
+      args:
+        MODULE: services/procurement-service
+    image: microinvent/procurement-service
+    env_file: .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+
+  sales-service:
+    build:
+      context: .
+      args:
+        MODULE: services/sales-service
+    image: microinvent/sales-service
+    env_file: .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+
+  rental-service:
+    build:
+      context: .
+      args:
+        MODULE: services/rental-service
+    image: microinvent/rental-service
+    env_file: .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+
+  report-service:
+    build:
+      context: .
+      args:
+        MODULE: services/report-service
+    image: microinvent/report-service
+    env_file: .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+
+  notification-service:
+    build:
+      context: .
+      args:
+        MODULE: services/notification-service
+    image: microinvent/notification-service
+    env_file: .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+
+  file-service:
+    build:
+      context: .
+      args:
+        MODULE: services/file-service
+    image: microinvent/file-service
+    env_file: .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
+
+volumes:
+  mysql-data:

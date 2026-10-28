@@ -1,0 +1,41 @@
+server:
+  port: ${PORT:8088}
+
+spring:
+  application:
+    name: notification-service
+  flyway:
+    enabled: false   # tenant-starter tự chạy Flyway cho từng tenant
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+microinvent:
+  tenant:
+    default-tenant: ${DEFAULT_TENANT:tigernet}
+    tenants: ${TENANTS:tigernet}
+    url-template: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/notification_%s?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Ho_Chi_Minh
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}

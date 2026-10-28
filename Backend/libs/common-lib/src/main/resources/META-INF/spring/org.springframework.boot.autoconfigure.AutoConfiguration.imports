@@ -1,0 +1,2 @@
+com.microinvent.common.autoconfigure.CommonWebAutoConfiguration
+com.microinvent.common.autoconfigure.WarehouseSecurityAutoConfiguration

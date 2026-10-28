@@ -1,0 +1,79 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: api-gateway
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  cloud:
+    gateway:
+      server:
+        webflux:
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowed-origins: ${CORS_ORIGINS:http://localhost:5173}
+                allowed-methods: "*"
+                allowed-headers: "*"
+                allow-credentials: true
+          routes:
+            - id: tenant
+              uri: lb://tenant-service
+              predicates:
+                - Path=/api/v1/tenants/**
+            - id: identity
+              uri: lb://identity-service
+              predicates:
+                - Path=/api/v1/auth/**,/api/v1/users/**,/api/v1/roles/**,/api/v1/settings/**
+            - id: catalog
+              uri: lb://catalog-service
+              predicates:
+                - Path=/api/v1/products/**,/api/v1/product-groups/**,/api/v1/suppliers/**,/api/v1/customers/**
+            - id: inventory
+              uri: lb://inventory-service
+              predicates:
+                - Path=/api/v1/warehouses/**,/api/v1/stocks/**,/api/v1/holds/**,/api/v1/transfers/**,/api/v1/stocktakes/**
+            - id: procurement
+              uri: lb://procurement-service
+              predicates:
+                - Path=/api/v1/receipts/**
+            - id: sales
+              uri: lb://sales-service
+              predicates:
+                - Path=/api/v1/exports/**,/api/v1/sales-returns/**,/api/v1/payments/**,/api/v1/debts/**
+            - id: rental
+              uri: lb://rental-service
+              predicates:
+                - Path=/api/v1/rentals/**
+            - id: report
+              uri: lb://report-service
+              predicates:
+                - Path=/api/v1/reports/**,/api/v1/dashboard/**,/api/v1/audit-logs/**
+            - id: notification
+              uri: lb://notification-service
+              predicates:
+                - Path=/api/v1/notifications/**
+            - id: notification-ws
+              uri: lb:ws://notification-service
+              predicates:
+                - Path=/ws/**
+            - id: file
+              uri: lb://file-service
+              predicates:
+                - Path=/api/v1/files/**
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
