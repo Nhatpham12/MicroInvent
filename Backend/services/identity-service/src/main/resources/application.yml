@@ -1,5 +1,6 @@
 server:
   port: ${PORT:8081}
+  forward-headers-strategy: framework
 
 spring:
   application:
@@ -36,3 +37,9 @@ microinvent:
     url-template: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/identity_%s?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Ho_Chi_Minh
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:root}
+  jwt:
+    secret: ${JWT_SECRET:change-me-to-a-256-bit-secret-change-me-to-a-256-bit-secret}
+    access-token-ttl: ${JWT_ACCESS_TTL:15m}
+    refresh-token-ttl: ${JWT_REFRESH_TTL:7d}
+  internal:
+    api-key: ${INTERNAL_API_KEY:change-me}

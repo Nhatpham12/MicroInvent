@@ -10,8 +10,12 @@
 	</parent>
 	<artifactId>api-gateway</artifactId>
 	<name>api-gateway</name>
-	<description>Spring Cloud Gateway – cổng vào /api/v1/**</description>
+	<description>Spring Cloud Gateway – cổng vào /api/v1/**: xác thực JWT, gắn header người dùng, rate limit, gộp Swagger</description>
 	<dependencies>
+		<dependency>
+			<groupId>com.microinvent</groupId>
+			<artifactId>common-lib</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
@@ -27,6 +31,24 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-api</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-impl</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-jackson</artifactId>
+			<scope>runtime</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

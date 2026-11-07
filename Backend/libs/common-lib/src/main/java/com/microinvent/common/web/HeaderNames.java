@@ -12,6 +12,10 @@ public final class HeaderNames {
     public static final String WAREHOUSE_ID = "X-Warehouse-Id";
     public static final String INTERNAL_KEY = "X-Internal-Key";
     public static final String IDEMPOTENCY_KEY = "Idempotency-Key";
+    public static final String TRACE_ID = "X-Trace-Id";
+
+    /** Khóa MDC cho traceId (log pattern dùng %X{traceId}). */
+    public static final String MDC_TRACE_ID = "traceId";
 
     private HeaderNames() {
     }

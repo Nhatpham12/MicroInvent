@@ -1,2 +1,7 @@
 com.microinvent.common.autoconfigure.CommonWebAutoConfiguration
 com.microinvent.common.autoconfigure.WarehouseSecurityAutoConfiguration
+com.microinvent.common.autoconfigure.JwtAutoConfiguration
+com.microinvent.common.autoconfigure.AmqpAutoConfiguration
+com.microinvent.common.autoconfigure.FeignAutoConfiguration
+com.microinvent.common.autoconfigure.IdempotencyAutoConfiguration
+com.microinvent.common.autoconfigure.OpenApiAutoConfiguration
