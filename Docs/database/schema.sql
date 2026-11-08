@@ -23,6 +23,11 @@
 --       stock_movements(nhật ký biến động)
 --     còn thông tin bán/thuê/thanh toán chuyển sang chứng từ ở order-service.
 --   * Mọi bảng có created_at / updated_at; xóa mềm bằng is_deleted.
+--   * Thời gian lưu theo UTC (MySQL chạy --default-time-zone=+00:00,
+--     JDBC: hibernate.jdbc.time_zone=UTC); FE tự đổi sang giờ VN khi hiển thị.
+--   * Từ W1: nguồn chuẩn là Flyway migration của từng service
+--     (V1__init.sql = phần DDL của database đó, thay đổi sau = V3__..., V4__...);
+--     file này giữ để đọc/review.
 -- =====================================================================
 
 CREATE DATABASE IF NOT EXISTS auth_db      CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -251,7 +256,9 @@ CREATE TABLE stock_balances (
   updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_balance (product_id, warehouse_id),
   FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),
-  CHECK (qty_on_hand >= 0 AND qty_hold >= 0 AND qty_damaged >= 0)
+  CHECK (qty_on_hand >= 0 AND qty_hold >= 0 AND qty_damaged >= 0
+         AND qty_in_transit_in >= 0 AND qty_rented_loaned >= 0),
+  CHECK (qty_hold + qty_damaged <= qty_on_hand)        -- tồn khả dụng không bao giờ âm (8.5#5)
 );
 
 -- Từng đơn vị hàng có serial (Has_Serial = TRUE)
@@ -293,6 +300,8 @@ CREATE TABLE stock_holds (
   created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_holds_active (status, expires_at),
+  INDEX idx_holds_balance (product_id, warehouse_id, status),
+  INDEX idx_holds_ref (ref_type, ref_id),
   FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),
   FOREIGN KEY (stock_item_id) REFERENCES stock_items(id)
 );
@@ -314,6 +323,7 @@ CREATE TABLE stock_movements (
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_mov_wh_time (warehouse_id, created_at),
   INDEX idx_mov_ref (ref_type, ref_id),
+  INDEX idx_mov_product_time (product_id, created_at),
   FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),
   FOREIGN KEY (stock_item_id) REFERENCES stock_items(id)
 );
@@ -441,6 +451,7 @@ CREATE TABLE export_slips (
   updated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_es_wh_date (warehouse_id, export_date),
   INDEX idx_es_customer (customer_id, payment_status),
+  INDEX idx_es_status (status, created_at),
   FOREIGN KEY (split_from_id) REFERENCES export_slips(id)
 );
 
@@ -577,6 +588,8 @@ CREATE TABLE stock_transfers (
   created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_tf_status (status, expected_date),
+  INDEX idx_tf_from (from_warehouse_id, status),
+  INDEX idx_tf_to (to_warehouse_id, status),
   CHECK (from_warehouse_id <> to_warehouse_id)
 );
 
@@ -626,11 +639,14 @@ CREATE TABLE payments (
 -- Transactional outbox: ghi event cùng transaction, worker đẩy lên RabbitMQ
 CREATE TABLE outbox_events (
   id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+  event_id     CHAR(36) NOT NULL UNIQUE,                -- UUID, consumer lưu vào report_db.processed_events
   event_type   VARCHAR(80) NOT NULL,                    -- receipt.confirmed, export.exported, transfer.shipped...
+  aggregate_type VARCHAR(30) NOT NULL,                  -- RECEIPT, EXPORT_SLIP, TRANSFER, RENTAL...
   aggregate_id INT NOT NULL,
   payload      JSON NOT NULL,
   status       ENUM('PENDING','PUBLISHED','FAILED') NOT NULL DEFAULT 'PENDING',
   retry_count  INT NOT NULL DEFAULT 0,
+  last_error   TEXT NULL,
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   published_at DATETIME NULL,
   INDEX idx_outbox_status (status, created_at)
