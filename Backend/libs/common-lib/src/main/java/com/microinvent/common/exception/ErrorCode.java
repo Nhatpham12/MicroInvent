@@ -20,6 +20,7 @@ public enum ErrorCode {
     CONFLICT(HttpStatus.CONFLICT, "Dữ liệu bị xung đột"),
     DUPLICATE_REQUEST(HttpStatus.CONFLICT, "Yêu cầu đang được xử lý hoặc đã xử lý"),
     STOCK_NOT_ENOUGH(HttpStatus.CONFLICT, "Không đủ tồn kho"),
+    WAREHOUSE_CANNOT_CLOSE(HttpStatus.CONFLICT, "Kho chưa đủ điều kiện ngừng hoạt động"),
     TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "Gửi quá nhiều yêu cầu, vui lòng thử lại sau"),
     SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Dịch vụ tạm thời không khả dụng"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Lỗi hệ thống");

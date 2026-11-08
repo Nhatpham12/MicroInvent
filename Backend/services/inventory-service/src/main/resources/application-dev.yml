@@ -1,0 +1,4 @@
+# CHỈ CHO MÁY DEV (--spring.profiles.active=dev). Không bao giờ bật profile này trên môi trường thật.
+microinvent:
+  internal:
+    api-key: ${INTERNAL_API_KEY:dev-only-internal-key}
