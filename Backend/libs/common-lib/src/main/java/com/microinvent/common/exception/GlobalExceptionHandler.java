@@ -60,10 +60,28 @@ public class GlobalExceptionHandler {
         return build(ErrorCode.METHOD_NOT_ALLOWED, ErrorCode.METHOD_NOT_ALLOWED.defaultMessage(), null);
     }
 
+    /**
+     * Spring hay bọc lỗi nghiệp vụ ném giữa chừng (vd. TENANT_NOT_FOUND lúc mở kết nối DB trong @Transactional
+     * thành CannotCreateTransactionException). Lần theo cause: có BusinessException thì trả đúng mã lỗi đó.
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleOther(Exception ex) {
+        BusinessException business = findBusinessCause(ex);
+        if (business != null) {
+            return handleBusiness(business);
+        }
         log.error("Unhandled exception", ex);
         return build(ErrorCode.INTERNAL_ERROR, ErrorCode.INTERNAL_ERROR.defaultMessage(), null);
+    }
+
+    private static BusinessException findBusinessCause(Throwable ex) {
+        Throwable t = ex.getCause();
+        for (int depth = 0; t != null && depth < 10; depth++, t = t.getCause()) {
+            if (t instanceof BusinessException be) {
+                return be;
+            }
+        }
+        return null;
     }
 
     private static ResponseEntity<ApiResponse<Void>> build(ErrorCode code, String message, Object details) {
