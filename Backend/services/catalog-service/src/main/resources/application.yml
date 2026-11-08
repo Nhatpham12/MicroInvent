@@ -33,4 +33,5 @@ microinvent:
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:root}
   internal:
-    api-key: ${INTERNAL_API_KEY:change-me}
+    # Bắt buộc đặt INTERNAL_API_KEY; thiếu thì service không khởi động.
+    api-key: ${INTERNAL_API_KEY}

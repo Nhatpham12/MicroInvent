@@ -32,7 +32,7 @@ import reactor.core.publisher.Mono;
 /**
  * Xác thực access token (Authorization: Bearer ...; riêng /ws/** cho phép ?access_token=) rồi gắn header
  * X-User-Id, X-User-Name, X-User-Roles, X-Warehouse-Ids, X-All-Warehouses và X-Tenant-Id (lấy từ token,
- * ghi đè giá trị client gửi) cho service phía sau. Đường dẫn public đi qua không cần token.
+ * ghi đè giá trị client gửi; token không có tenant thì xóa header) cho service phía sau. Đường dẫn public đi qua không cần token.
  */
 @Component
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
@@ -75,8 +75,11 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             h.set(HeaderNames.WAREHOUSE_IDS,
                     p.warehouseIds().stream().sorted().map(String::valueOf).collect(Collectors.joining(",")));
             h.set(HeaderNames.ALL_WAREHOUSES, String.valueOf(p.allWarehouses()));
+            // Tenant chỉ tin từ token; token không có tenant thì bỏ giá trị client gửi để không chọn bừa tenant.
             if (StringUtils.hasText(p.tenantId())) {
                 h.set(HeaderNames.TENANT_ID, p.tenantId());
+            } else {
+                h.remove(HeaderNames.TENANT_ID);
             }
         })).build();
         return chain.filter(authenticated);

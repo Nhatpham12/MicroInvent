@@ -1,0 +1,4 @@
+# CHỈ CHO MÁY DEV (--spring.profiles.active=dev). Không bao giờ bật profile này trên môi trường thật.
+microinvent:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-jwt-secret-dev-only-jwt-secret-0123456789}

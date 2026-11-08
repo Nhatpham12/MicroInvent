@@ -87,6 +87,23 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    void tokenWithoutTenantDropsClientTenantHeader() {
+        String token = jwt.issueAccessToken(new JwtPrincipal(5L, "thukho", null, Set.of("STOREKEEPER"), Set.of(1L), false));
+
+        run(MockServerHttpRequest.get("/api/v1/products")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .header(HeaderNames.TENANT_ID, "tenant-khac"));
+
+        assertThat(forwarded.get().getHeaders().containsKey(HeaderNames.TENANT_ID)).isFalse();
+    }
+
+    @Test
+    void publicPathKeepsClientTenantForLogin() {
+        run(MockServerHttpRequest.post("/api/v1/auth/login").header(HeaderNames.TENANT_ID, "abc"));
+        assertThat(forwarded.get().getHeaders().getFirst(HeaderNames.TENANT_ID)).isEqualTo("abc");
+    }
+
+    @Test
     void websocketAcceptsTokenFromQuery() {
         String token = jwt.issueAccessToken(new JwtPrincipal(1L, "admin", "tigernet", Set.of("ADMIN"), null, true));
         run(MockServerHttpRequest.get("/ws/notifications?access_token=" + token));

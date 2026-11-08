@@ -15,7 +15,7 @@ public class FeignAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public InternalFeignInterceptor internalFeignInterceptor(
-            @Value("${microinvent.internal.api-key:${INTERNAL_API_KEY:change-me}}") String apiKey) {
+            @Value("${microinvent.internal.api-key:${INTERNAL_API_KEY:}}") String apiKey) {
         return new InternalFeignInterceptor(apiKey);
     }
 }

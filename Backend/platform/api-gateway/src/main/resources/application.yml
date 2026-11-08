@@ -180,7 +180,9 @@ springdoc:
 
 microinvent:
   jwt:
-    secret: ${JWT_SECRET:change-me-to-a-256-bit-secret-change-me-to-a-256-bit-secret}
+    # Bắt buộc đặt JWT_SECRET (>= 32 byte, trùng với identity-service); thiếu thì gateway không khởi động.
+    # Chạy local dùng profile "dev" (application-dev.yml).
+    secret: ${JWT_SECRET}
   gateway:
     # Không cần access token. /internal/** không có route nên không gọi được từ ngoài.
     public-paths:

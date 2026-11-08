@@ -26,7 +26,7 @@ public class CommonWebAutoConfiguration {
 
     @Bean
     public FilterRegistrationBean<InternalApiKeyFilter> internalApiKeyFilter(
-            @Value("${microinvent.internal.api-key:${INTERNAL_API_KEY:change-me}}") String apiKey) {
+            @Value("${microinvent.internal.api-key:${INTERNAL_API_KEY:}}") String apiKey) {
         FilterRegistrationBean<InternalApiKeyFilter> bean = new FilterRegistrationBean<>(new InternalApiKeyFilter(apiKey));
         bean.setOrder(Ordered.HIGHEST_PRECEDENCE + 20);
         return bean;
