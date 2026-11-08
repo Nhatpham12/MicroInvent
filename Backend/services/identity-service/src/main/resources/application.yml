@@ -1,5 +1,6 @@
 server:
   port: ${PORT:8081}
+  forward-headers-strategy: framework
 
 spring:
   application:
@@ -36,3 +37,12 @@ microinvent:
     url-template: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/identity_%s?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Ho_Chi_Minh
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:root}
+  jwt:
+    # Bắt buộc đặt JWT_SECRET (>= 32 byte, trùng với api-gateway); thiếu thì service không khởi động.
+    # Chạy local dùng profile "dev" (application-dev.yml).
+    secret: ${JWT_SECRET}
+    access-token-ttl: ${JWT_ACCESS_TTL:15m}
+    refresh-token-ttl: ${JWT_REFRESH_TTL:7d}
+  internal:
+    # Bắt buộc đặt INTERNAL_API_KEY; thiếu thì service không khởi động.
+    api-key: ${INTERNAL_API_KEY}

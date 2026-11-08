@@ -1,0 +1,12 @@
+# CHỈ CHO MÁY DEV (--spring.profiles.active=dev). Không bao giờ bật profile này trên môi trường thật.
+# Bật profile này sẽ: dùng khóa dev mặc định (nếu chưa đặt biến môi trường) và nạp thêm tài khoản demo
+# (db/dev-seed) cho mọi tenant.
+microinvent:
+  tenant:
+    migration-locations:
+      - classpath:db/migration
+      - classpath:db/dev-seed
+  jwt:
+    secret: ${JWT_SECRET:dev-only-jwt-secret-dev-only-jwt-secret-0123456789}
+  internal:
+    api-key: ${INTERNAL_API_KEY:dev-only-internal-key}

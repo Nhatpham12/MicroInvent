@@ -10,16 +10,24 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
+import org.slf4j.MDC;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/** Đọc header do gateway gắn vào và dựng TenantContext + UserContext cho request. */
+/** Đọc header do gateway gắn vào và dựng TenantContext + UserContext + traceId (MDC) cho request. */
 public class ContextHeaderFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
+        String traceId = request.getHeader(HeaderNames.TRACE_ID);
+        if (!StringUtils.hasText(traceId)) {
+            traceId = UUID.randomUUID().toString().replace("-", "");
+        }
+        MDC.put(HeaderNames.MDC_TRACE_ID, traceId);
+        response.setHeader(HeaderNames.TRACE_ID, traceId);
         try {
             String tenant = request.getHeader(HeaderNames.TENANT_ID);
             if (StringUtils.hasText(tenant)) {
@@ -40,6 +48,7 @@ public class ContextHeaderFilter extends OncePerRequestFilter {
         } finally {
             TenantContext.clear();
             UserContextHolder.clear();
+            MDC.remove(HeaderNames.MDC_TRACE_ID);
         }
     }
 

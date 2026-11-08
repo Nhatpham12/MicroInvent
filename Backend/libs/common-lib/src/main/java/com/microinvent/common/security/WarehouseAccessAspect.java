@@ -10,8 +10,9 @@ import org.aspectj.lang.annotation.Before;
 @Aspect
 public class WarehouseAccessAspect {
 
-    @Before("@annotation(access) || @within(access)")
-    public void check(RequireWarehouseAccess access) {
+    @Before("@annotation(com.microinvent.common.security.RequireWarehouseAccess) "
+            + "|| @within(com.microinvent.common.security.RequireWarehouseAccess)")
+    public void check() {
         UserContext user = UserContextHolder.get();
         if (user.userId() == null) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);

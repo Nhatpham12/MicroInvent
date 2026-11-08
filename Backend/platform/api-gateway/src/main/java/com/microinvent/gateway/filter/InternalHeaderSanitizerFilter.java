@@ -1,5 +1,6 @@
 package com.microinvent.gateway.filter;
 
+import com.microinvent.common.web.HeaderNames;
 import java.util.List;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -10,13 +11,13 @@ import reactor.core.publisher.Mono;
 
 /**
  * Xóa các header nội bộ do client tự gửi lên để không giả mạo được người dùng.
- * TODO(identity): thêm JwtAuthFilter xác thực token rồi gắn lại X-User-* từ claims.
+ * JwtAuthenticationFilter (chạy ngay sau) gắn lại X-User-* từ claims của access token.
  */
 @Component
 public class InternalHeaderSanitizerFilter implements GlobalFilter, Ordered {
 
-    private static final List<String> INTERNAL_HEADERS = List.of("X-User-Id", "X-User-Name", "X-User-Roles",
-            "X-Warehouse-Ids", "X-All-Warehouses", "X-Internal-Key");
+    static final List<String> INTERNAL_HEADERS = List.of(HeaderNames.USER_ID, HeaderNames.USER_NAME,
+            HeaderNames.USER_ROLES, HeaderNames.WAREHOUSE_IDS, HeaderNames.ALL_WAREHOUSES, HeaderNames.INTERNAL_KEY);
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -28,6 +29,6 @@ public class InternalHeaderSanitizerFilter implements GlobalFilter, Ordered {
 
     @Override
     public int getOrder() {
-        return Ordered.HIGHEST_PRECEDENCE;
+        return Ordered.HIGHEST_PRECEDENCE + 1;
     }
 }
