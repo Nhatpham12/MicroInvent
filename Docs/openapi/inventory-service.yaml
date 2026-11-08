@@ -1,0 +1,1334 @@
+openapi: 3.0.3
+info:
+  title: MicroInvent – inventory-service
+  version: 0.1.0-draft
+  description: |
+    Kho, tồn kho, serial, giữ hàng, chuyển kho, nhật ký biến động, kiểm kê. **Nguồn sự thật duy nhất về tồn.**
+
+    Bản nháp (Quân) – theo cấu trúc Backend của Nhật (commit `0f039f2`); chốt ở W2, sau đó
+    mọi thay đổi contract cần Nghĩa approve PR.
+
+    * Gọi qua gateway `http://localhost:8080` (route `/api/v1/warehouses|stocks|holds|transfers|stocktakes/**`);
+      gateway xác thực JWT và chuyển xuống header `X-User-Id`, `X-User-Name`, `X-User-Roles`,
+      `X-Warehouse-Ids`, `X-All-Warehouses` (common-lib dựng `UserContext`).
+    * `X-Tenant-Id`: tenant (doanh nghiệp); bỏ trống = tenant mặc định `tigernet`; mã lạ → 400 `TENANT_NOT_FOUND`.
+    * `X-Warehouse-Id`: kho đang làm việc (bộ chọn kho trên header FE).
+    * `/internal/*` chỉ gọi giữa các service (procurement, sales, rental), không route qua gateway:
+      header `X-Internal-Key` + `Idempotency-Key` bắt buộc.
+    * Response (`ApiResponse` của common-lib, bỏ trường null): thành công `{ success: true, data, meta? }`,
+      lỗi `{ success: false, error: { code, message, details? } }`.
+    * Danh sách phân trang: `data` = `PageResponse { content, page, size, totalElements, totalPages }`;
+      query chuẩn Spring Data `?page=0&size=20&sort=field,asc` (page bắt đầu từ 0).
+    * Swagger chạy thật do springdoc sinh từ code; file này là contract chốt trước để FE mock (MSW).
+    * Số lượng tồn: `available = on_hand − hold − damaged`.
+servers:
+  - url: http://localhost:8080
+    description: api-gateway
+  - url: http://localhost:8083
+    description: inventory-service (gọi thẳng, chỉ dev – bình thường đi qua gateway lb://inventory-service)
+tags:
+  - name: Health
+  - name: Warehouses
+    description: Danh mục kho (SRS 3.10.1)
+  - name: MinStock
+    description: Ngưỡng tồn theo kho (SRS 3.10.4)
+  - name: Stock
+    description: Tra cứu tồn (SRS 3.10.4)
+  - name: Holds
+    description: Giữ hàng (SRS 3.4.2)
+  - name: Transfers
+    description: Chuyển kho 8 trạng thái (SRS 3.10.5, UC-004/005)
+  - name: Stocktakes
+    description: Kiểm kê (SRS 3.6)
+  - name: Locations
+    description: Vị trí Khu-Kệ-Ô – stretch goal (SRS 3.10.2)
+  - name: Internal
+    description: API nội bộ cho procurement / sales / rental-service (SRS 3.10.7)
+security:
+  - bearerAuth: []
+
+paths:
+  /actuator/health:
+    get:
+      tags: [Health]
+      summary: Health check (Spring Boot Actuator)
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: UP }
+                  components: { type: object, description: 'db, redis, rabbit, diskSpace…' }
+
+  # ------------------------------------------------------------------ Kho
+  /api/v1/warehouses:
+    get:
+      tags: [Warehouses]
+      summary: Danh sách kho (kèm tổng tồn, giá trị tồn)
+      description: Vai trò không có `all_warehouses` chỉ thấy kho được gán.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/Sort'
+        - { name: q, in: query, schema: { type: string }, description: Tìm theo mã/tên }
+        - { name: type, in: query, schema: { $ref: '#/components/schemas/WarehouseType' } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/WarehouseStatus' } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - properties:
+                              content: { type: array, items: { $ref: '#/components/schemas/WarehouseSummary' } }
+    post:
+      tags: [Warehouses]
+      summary: Tạo kho (ADMIN)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseInput' }
+      responses:
+        '201': { $ref: '#/components/responses/Warehouse' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /api/v1/warehouses/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get:
+      tags: [Warehouses]
+      summary: Chi tiết kho
+      responses:
+        '200': { $ref: '#/components/responses/Warehouse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Warehouses]
+      summary: Sửa thông tin kho, thủ kho phụ trách, màu nhận diện (ADMIN)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Warehouse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/warehouses/{id}/close-check:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get:
+      tags: [Warehouses]
+      summary: Kiểm tra điều kiện ngừng hoạt động (ADMIN)
+      description: Kho chỉ được CLOSED khi hết tồn, không còn hàng đang chuyển đến/đi, không còn phiếu dở dang.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          canClose: { type: boolean }
+                          blockers:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                type: { type: string, enum: [STOCK_REMAINING, IN_TRANSIT, OPEN_DOCUMENTS, ACTIVE_HOLDS, ACTIVE_RENTALS] }
+                                count: { type: integer }
+                                message: { type: string }
+
+  /api/v1/warehouses/{id}/status:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    patch:
+      tags: [Warehouses]
+      summary: Đổi trạng thái ACTIVE / SUSPENDED / CLOSED (ADMIN) – kịch bản 8.5#8
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: '#/components/schemas/WarehouseStatus' }
+                reason: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Warehouse' }
+        '409':
+          description: WAREHOUSE_CANNOT_CLOSE – còn điều kiện chặn (xem close-check)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  /api/v1/warehouses/{id}/default:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    patch:
+      tags: [Warehouses]
+      summary: Đặt kho mặc định hệ thống (ADMIN)
+      responses:
+        '200': { $ref: '#/components/responses/Warehouse' }
+
+  /api/v1/warehouses/{id}/min-stock:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get:
+      tags: [MinStock]
+      summary: Ngưỡng tồn tối thiểu theo sản phẩm tại kho
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/MinStockSetting' } }
+    put:
+      tags: [MinStock]
+      summary: Đặt ngưỡng tồn (bulk, ADMIN/MANAGER)
+      description: Gửi `minStock = null` để xóa ngưỡng riêng (dùng ngưỡng chung của sản phẩm).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [productId, minStock]
+                    properties:
+                      productId: { type: integer }
+                      minStock: { type: integer, minimum: 0, nullable: true }
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+
+  /api/v1/warehouses/{id}/locations:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get:
+      tags: [Locations]
+      summary: Danh sách vị trí Khu-Kệ-Ô (stretch)
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+    post:
+      tags: [Locations]
+      summary: Tạo vị trí (stretch)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, example: A-02-3 }
+                description: { type: string }
+      responses:
+        '201': { $ref: '#/components/responses/Ok' }
+
+  # ------------------------------------------------------------------ Tồn kho
+  /api/v1/stocks:
+    get:
+      tags: [Stock]
+      summary: Tồn theo (sản phẩm, kho)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/Sort'
+        - { name: warehouseId, in: query, schema: { type: integer }, description: Bỏ trống = mọi kho được phép xem }
+        - { name: productId, in: query, schema: { type: integer } }
+        - { name: groupId, in: query, schema: { type: integer } }
+        - { name: belowMin, in: query, schema: { type: boolean } }
+        - { name: hasStock, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - properties:
+                              content: { type: array, items: { $ref: '#/components/schemas/StockBalance' } }
+
+  /api/v1/stocks/products/{productId}:
+    get:
+      tags: [Stock]
+      summary: Tồn 1 sản phẩm ở tất cả kho (≤ 1s, SRS 4.1)
+      parameters:
+        - { name: productId, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          productId: { type: integer }
+                          totals: { $ref: '#/components/schemas/StockQty' }
+                          warehouses: { type: array, items: { $ref: '#/components/schemas/StockBalance' } }
+
+  /api/v1/stocks/serials/{serial}:
+    get:
+      tags: [Stock]
+      summary: Tra cứu serial – kho hiện tại / đang chuyển / đang thuê / đã bán
+      parameters:
+        - { name: serial, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/StockItem'
+                          - properties:
+                              history: { type: array, items: { $ref: '#/components/schemas/StockMovement' } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/stocks/items:
+    get:
+      tags: [Stock]
+      summary: Danh sách đơn vị có serial theo kho / SP / trạng thái
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - { name: warehouseId, in: query, schema: { type: integer } }
+        - { name: productId, in: query, schema: { type: integer } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/StockItemStatus' } }
+        - { name: q, in: query, schema: { type: string }, description: Tìm serial }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - properties:
+                              content: { type: array, items: { $ref: '#/components/schemas/StockItem' } }
+
+  /api/v1/stocks/items/{id}/location:
+    patch:
+      tags: [Locations]
+      summary: Chuyển vị trí trong cùng kho (stretch)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [locationId]
+              properties:
+                locationId: { type: integer }
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+
+  /api/v1/stocks/low:
+    get:
+      tags: [Stock]
+      summary: Sản phẩm dưới ngưỡng theo kho và toàn hệ thống (SRS 3.9)
+      parameters:
+        - { name: warehouseId, in: query, schema: { type: integer } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties:
+                      data:
+                        type: array
+                        items:
+                          allOf:
+                            - $ref: '#/components/schemas/StockBalance'
+                            - properties:
+                                minStock: { type: integer }
+                                shortage: { type: integer }
+
+  /api/v1/stocks/movements:
+    get:
+      tags: [Stock]
+      summary: Nhật ký biến động tồn
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - { name: warehouseId, in: query, schema: { type: integer } }
+        - { name: productId, in: query, schema: { type: integer } }
+        - { name: type, in: query, schema: { $ref: '#/components/schemas/MovementType' } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - properties:
+                              content: { type: array, items: { $ref: '#/components/schemas/StockMovement' } }
+
+  /api/v1/stocks/damaged:
+    post:
+      tags: [Stock]
+      summary: Đánh dấu hàng hư hỏng tại kho (qty_damaged)
+      parameters: [{ $ref: '#/components/parameters/WarehouseHeader' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [warehouseId, productId, qty]
+              properties:
+                warehouseId: { type: integer }
+                productId: { type: integer }
+                qty: { type: integer, minimum: 1 }
+                serials: { type: array, items: { type: string } }
+                note: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+        '409': { $ref: '#/components/responses/StockNotEnough' }
+
+  # ------------------------------------------------------------------ Giữ hàng
+  /api/v1/holds:
+    get:
+      tags: [Holds]
+      summary: Danh sách giữ hàng (ai giữ, cho khách nào, đến khi nào)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - { name: warehouseId, in: query, schema: { type: integer } }
+        - { name: productId, in: query, schema: { type: integer } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/HoldStatus' } }
+        - { name: mine, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - properties:
+                              content: { type: array, items: { $ref: '#/components/schemas/Hold' } }
+    post:
+      tags: [Holds]
+      summary: Giữ hàng cho khách (trừ tồn khả dụng; mặc định hết hạn sau HOLD_DAYS)
+      parameters: [{ $ref: '#/components/parameters/WarehouseHeader' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [warehouseId, productId, qty]
+              properties:
+                warehouseId: { type: integer }
+                productId: { type: integer }
+                qty: { type: integer, minimum: 1 }
+                serials: { type: array, items: { type: string }, description: Bắt buộc với SP có serial }
+                customerId: { type: integer }
+                expiresAt: { type: string, format: date-time }
+                note: { type: string }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties:
+                      data: { $ref: '#/components/schemas/Hold' }
+        '409': { $ref: '#/components/responses/StockNotEnough' }
+
+  /api/v1/holds/{id}/extend:
+    patch:
+      tags: [Holds]
+      summary: Gia hạn giữ hàng
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expiresAt]
+              properties:
+                expiresAt: { type: string, format: date-time }
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+
+  /api/v1/holds/{id}:
+    delete:
+      tags: [Holds]
+      summary: Nhả hàng đang giữ
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+
+  # ------------------------------------------------------------------ Kiểm kê
+  /api/v1/stocktakes:
+    get:
+      tags: [Stocktakes]
+      summary: Danh sách phiếu kiểm kê
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - { name: warehouseId, in: query, schema: { type: integer } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/StocktakeStatus' } }
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+    post:
+      tags: [Stocktakes]
+      summary: Lập phiếu kiểm kê (snapshot tồn, tùy chọn khóa giao dịch kho)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [warehouseId]
+              properties:
+                warehouseId: { type: integer }
+                productIds: { type: array, items: { type: integer }, description: Bỏ trống = toàn kho }
+                lockTransactions: { type: boolean, default: false }
+                note: { type: string }
+      responses:
+        '201': { $ref: '#/components/responses/Stocktake' }
+
+  /api/v1/stocktakes/{id}:
+    get:
+      tags: [Stocktakes]
+      summary: Chi tiết phiếu + chênh lệch
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { $ref: '#/components/responses/Stocktake' }
+
+  /api/v1/stocktakes/{id}/items:
+    put:
+      tags: [Stocktakes]
+      summary: Nhập số lượng thực tế / serial quét được
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [productId]
+                    properties:
+                      productId: { type: integer }
+                      actualQty: { type: integer, minimum: 0 }
+                      scannedSerials: { type: array, items: { type: string } }
+                      note: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Stocktake' }
+
+  /api/v1/stocktakes/{id}/submit:
+    post:
+      tags: [Stocktakes]
+      summary: Gửi duyệt
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { $ref: '#/components/responses/Stocktake' }
+
+  /api/v1/stocktakes/{id}/approve:
+    post:
+      tags: [Stocktakes]
+      summary: Duyệt → tạo điều chỉnh tồn (movement ADJUST), mở khóa kho (MANAGER)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { $ref: '#/components/responses/Stocktake' }
+
+  /api/v1/stocktakes/{id}/cancel:
+    post:
+      tags: [Stocktakes]
+      summary: Hủy phiếu, mở khóa kho
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { $ref: '#/components/responses/Stocktake' }
+
+  # ------------------------------------------------------------------ Chuyển kho
+  /api/v1/transfers:
+    get:
+      tags: [Transfers]
+      summary: Danh sách phiếu chuyển (chuyển đi / chuyển đến, đánh dấu quá hạn)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/Sort'
+        - { name: direction, in: query, schema: { type: string, enum: [out, in] }, description: So với kho đang làm việc (X-Warehouse-Id) }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/TransferStatus' } }
+        - { name: warehouseId, in: query, schema: { type: integer } }
+        - { name: overdue, in: query, schema: { type: boolean }, description: IN_TRANSIT quá TRANSFER_OVERDUE_DAYS }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - properties:
+                              content: { type: array, items: { $ref: '#/components/schemas/Transfer' } }
+    post:
+      tags: [Transfers]
+      summary: Tạo phiếu nháp (kho nguồn ≠ kho đích) – PCK-yyyy-nnnn
+      parameters: [{ $ref: '#/components/parameters/WarehouseHeader' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransferInput' }
+      responses:
+        '201': { $ref: '#/components/responses/Transfer' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /api/v1/transfers/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get:
+      tags: [Transfers]
+      summary: Chi tiết phiếu chuyển (kèm dòng hàng, sai lệch)
+      responses:
+        '200': { $ref: '#/components/responses/Transfer' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Transfers]
+      summary: Sửa phiếu (chỉ khi DRAFT)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransferInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Transfer' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/transfers/{id}/submit:
+    post:
+      tags: [Transfers]
+      summary: Gửi duyệt → PENDING, giữ hàng kho nguồn (dưới TRANSFER_APPROVAL_THRESHOLD → APPROVED luôn)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { $ref: '#/components/responses/Transfer' }
+        '409': { $ref: '#/components/responses/StockNotEnough' }
+
+  /api/v1/transfers/{id}/approve:
+    post:
+      tags: [Transfers]
+      summary: Duyệt → APPROVED (MANAGER)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { $ref: '#/components/responses/Transfer' }
+
+  /api/v1/transfers/{id}/reject:
+    post:
+      tags: [Transfers]
+      summary: Từ chối → DRAFT, nhả hàng giữ (MANAGER)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Transfer' }
+
+  /api/v1/transfers/{id}/ship:
+    post:
+      tags: [Transfers]
+      summary: Xác nhận xuất → IN_TRANSIT; trừ tồn kho nguồn, cộng qty_in_transit_in kho đích (8.5#3)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                shippingMethod: { type: string, enum: [INTERNAL, CARRIER] }
+                trackingNo: { type: string }
+                shippingCost: { type: number }
+                expectedDate: { type: string, format: date }
+                serialsSent:
+                  type: array
+                  description: Serial thực xuất cho từng dòng (SP có serial)
+                  items:
+                    type: object
+                    properties:
+                      itemId: { type: integer }
+                      serials: { type: array, items: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Transfer' }
+
+  /api/v1/transfers/{id}/receive:
+    post:
+      tags: [Transfers]
+      summary: Kho đích xác nhận nhận → RECEIVED, hoặc DISCREPANCY nếu thiếu/hỏng/thừa (UC-005, 8.5#4)
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/WarehouseHeader' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [itemId, qtyReceived]
+                    properties:
+                      itemId: { type: integer }
+                      qtyReceived: { type: integer, minimum: 0 }
+                      qtyDamaged: { type: integer, minimum: 0, default: 0 }
+                      serialsReceived: { type: array, items: { type: string } }
+                      conditionNote: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Transfer' }
+
+  /api/v1/transfers/{id}/discrepancies/{dId}/resolve:
+    post:
+      tags: [Transfers]
+      summary: Xử lý sai lệch – gửi bổ sung / ghi nhận mất-hỏng / hoàn về kho nguồn (MANAGER)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - { name: dId, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resolution]
+              properties:
+                resolution: { type: string, enum: [RESEND, LOSS, RETURN_TO_SOURCE] }
+                note: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Transfer' }
+
+  /api/v1/transfers/{id}/complete:
+    post:
+      tags: [Transfers]
+      summary: Đóng phiếu → COMPLETED (MANAGER; mọi sai lệch đã xử lý)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { $ref: '#/components/responses/Transfer' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/transfers/{id}/cancel:
+    post:
+      tags: [Transfers]
+      summary: Hủy (chỉ trước IN_TRANSIT), nhả hàng giữ (8.5#9)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { $ref: '#/components/responses/Transfer' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/transfers/{id}/pdf:
+    get:
+      tags: [Transfers]
+      summary: In biên bản bàn giao nội bộ
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: PDF
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+
+  # ------------------------------------------------------------------ Internal
+  /internal/stock/check:
+    post:
+      tags: [Internal]
+      summary: Kiểm tồn khả dụng nhiều dòng + gợi ý kho khác (không cần Idempotency-Key)
+      security: [{ internalKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [warehouseId, items]
+              properties:
+                warehouseId: { type: integer }
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [productId, qty]
+                    properties:
+                      productId: { type: integer }
+                      qty: { type: integer, minimum: 1 }
+                      serials: { type: array, items: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          enough: { type: boolean }
+                          lines:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                productId: { type: integer }
+                                requested: { type: integer }
+                                available: { type: integer }
+                                shortage: { type: integer }
+                                otherWarehouses:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      warehouseId: { type: integer }
+                                      warehouseName: { type: string }
+                                      available: { type: integer }
+
+  /internal/stock/receive:
+    post:
+      tags: [Internal]
+      summary: Cộng tồn khi nhập kho / nhận trả (tạo stock_items cho serial)
+      description: Serial đã tồn tại ở bất kỳ kho nào → 409 SERIAL_DUPLICATED.
+      security: [{ internalKey: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/InternalStockRequest'
+                - properties:
+                    lines:
+                      type: array
+                      items:
+                        allOf:
+                          - $ref: '#/components/schemas/InternalStockLine'
+                          - properties:
+                              unitCost: { type: number }
+                              supplierId: { type: integer }
+                              condition: { type: string, enum: [GOOD, DAMAGED], default: GOOD }
+      responses:
+        '200': { $ref: '#/components/responses/InternalResult' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /internal/stock/reserve:
+    post:
+      tags: [Internal]
+      summary: Giữ hàng cho chứng từ (EXPORT_SLIP / RENTAL)
+      description: Chạy trong 1 transaction với `@Lock(PESSIMISTIC_WRITE)` trên stock_balances + Redisson lock theo (tenant, SP, kho). 2 request cùng serial → chỉ 1 thành công (8.5#5).
+      security: [{ internalKey: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/InternalStockRequest'
+                - properties:
+                    expiresAt: { type: string, format: date-time }
+                    customerId: { type: integer }
+      responses:
+        '200': { $ref: '#/components/responses/InternalResult' }
+        '409': { $ref: '#/components/responses/StockNotEnough' }
+
+  /internal/stock/commit:
+    post:
+      tags: [Internal]
+      summary: Trừ tồn thực theo hold đã giữ (xuất, cho thuê/mượn)
+      security: [{ internalKey: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/InternalStockRequest'
+                - properties:
+                    movementType: { type: string, enum: [EXPORT, RENT, LOAN, DAMAGED, WARRANTY] }
+      responses:
+        '200': { $ref: '#/components/responses/InternalResult' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /internal/stock/release:
+    post:
+      tags: [Internal]
+      summary: Nhả hold của chứng từ khi hủy / từ chối
+      security: [{ internalKey: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refType, refId]
+              properties:
+                refType: { type: string, enum: [EXPORT_SLIP, RENTAL] }
+                refId: { type: integer }
+      responses:
+        '200': { $ref: '#/components/responses/InternalResult' }
+
+  /internal/stock/reverse:
+    post:
+      tags: [Internal]
+      summary: Ánh xạ ngược tồn khi sửa / hủy phiếu nhập đã xác nhận
+      description: Không cho đảo nếu serial của phiếu đã rời trạng thái AVAILABLE → 409 STOCK_ALREADY_USED.
+      security: [{ internalKey: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InternalStockRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/InternalResult' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    internalKey:
+      type: apiKey
+      in: header
+      name: X-Internal-Key
+
+  parameters:
+    Id: { name: id, in: path, required: true, schema: { type: integer } }
+    Page: { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+    Size: { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+    Sort: { name: sort, in: query, schema: { type: string, example: 'createdAt,desc' } }
+    TenantHeader:
+      name: X-Tenant-Id
+      in: header
+      description: Mã tenant; bỏ trống = tigernet
+      schema: { type: string, example: tigernet }
+    WarehouseHeader:
+      name: X-Warehouse-Id
+      in: header
+      description: Kho đang làm việc; server kiểm tra quyền bằng `@RequireWarehouseAccess(write = true)`
+      schema: { type: integer }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: 'Gợi ý: <refType>:<refId>:<action>, vd EXPORT_SLIP:12:commit. Gọi lại cùng key trả lại kết quả cũ.'
+      schema: { type: string, maxLength: 100 }
+
+  responses:
+    Ok:
+      description: OK
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Envelope' }
+    Warehouse:
+      description: OK
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Envelope'
+              - properties:
+                  data: { $ref: '#/components/schemas/Warehouse' }
+    Stocktake:
+      description: OK
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Envelope'
+              - properties:
+                  data: { $ref: '#/components/schemas/Stocktake' }
+    Transfer:
+      description: OK
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Envelope'
+              - properties:
+                  data: { $ref: '#/components/schemas/Transfer' }
+    InternalResult:
+      description: OK
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Envelope'
+              - properties:
+                  data:
+                    type: object
+                    properties:
+                      movements: { type: array, items: { $ref: '#/components/schemas/StockMovement' } }
+                      holdIds: { type: array, items: { type: integer } }
+                      unitCosts:
+                        type: array
+                        description: Giá vốn từng dòng lúc commit (sales-service lưu vào unit_cost)
+                        items:
+                          type: object
+                          properties:
+                            productId: { type: integer }
+                            unitCost: { type: number }
+    NotFound:
+      description: NOT_FOUND
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Forbidden:
+      description: WAREHOUSE_FORBIDDEN / FORBIDDEN
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Conflict:
+      description: CONFLICT (trùng mã, SERIAL_DUPLICATED, WAREHOUSE_LOCKED, STOCK_ALREADY_USED…)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    StockNotEnough:
+      description: STOCK_NOT_ENOUGH – details chứa từng dòng thiếu
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    ValidationError:
+      description: VALIDATION_ERROR
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  schemas:
+    Envelope:
+      type: object
+      description: ApiResponse (common-lib) – trường null không trả về
+      properties:
+        success: { type: boolean, example: true }
+        data: {}
+        meta: { type: object }
+    ErrorEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        error:
+          type: object
+          properties:
+            code: { type: string, example: STOCK_NOT_ENOUGH }
+            message: { type: string }
+            details: {}
+    PageResponse:
+      type: object
+      description: PageResponse (common-lib)
+      properties:
+        content: { type: array, items: {} }
+        page: { type: integer, description: Bắt đầu từ 0 }
+        size: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+
+    WarehouseType: { type: string, enum: [MAIN, BRANCH, WARRANTY, DAMAGED] }
+    WarehouseStatus: { type: string, enum: [ACTIVE, SUSPENDED, CLOSED] }
+    WarehouseInput:
+      type: object
+      required: [code, name, type, address]
+      properties:
+        code: { type: string, maxLength: 20, example: HN01 }
+        name: { type: string, maxLength: 100 }
+        type: { $ref: '#/components/schemas/WarehouseType' }
+        address: { type: string, maxLength: 255 }
+        province: { type: string }
+        phone: { type: string }
+        email: { type: string, format: email }
+        managerUserId: { type: integer, nullable: true }
+        color: { type: string, pattern: '^#[0-9A-Fa-f]{6}$', example: '#1677FF' }
+        note: { type: string }
+    Warehouse:
+      allOf:
+        - $ref: '#/components/schemas/WarehouseInput'
+        - type: object
+          properties:
+            id: { type: integer }
+            status: { $ref: '#/components/schemas/WarehouseStatus' }
+            isDefault: { type: boolean }
+            isStocktakeLocked: { type: boolean }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+    WarehouseSummary:
+      allOf:
+        - $ref: '#/components/schemas/Warehouse'
+        - type: object
+          properties:
+            totalQty: { type: integer }
+            stockValue: { type: number }
+    MinStockSetting:
+      type: object
+      properties:
+        productId: { type: integer }
+        warehouseId: { type: integer }
+        minStock: { type: integer }
+
+    StockQty:
+      type: object
+      properties:
+        onHand: { type: integer }
+        hold: { type: integer }
+        damaged: { type: integer }
+        available: { type: integer, description: onHand − hold − damaged }
+        inTransitIn: { type: integer }
+        rentedLoaned: { type: integer }
+    StockBalance:
+      allOf:
+        - $ref: '#/components/schemas/StockQty'
+        - type: object
+          properties:
+            productId: { type: integer }
+            warehouseId: { type: integer }
+            warehouseName: { type: string }
+            avgCost: { type: number }
+            stockValue: { type: number }
+            updatedAt: { type: string, format: date-time }
+    StockItemStatus:
+      type: string
+      enum: [AVAILABLE, HOLD, IN_TRANSIT, RENTED, LOANED, SOLD, DAMAGED, RETURNED_TO_SUPPLIER]
+    StockItem:
+      type: object
+      properties:
+        id: { type: integer }
+        productId: { type: integer }
+        serial: { type: string }
+        warehouseId: { type: integer, nullable: true }
+        lastWarehouseId: { type: integer, nullable: true }
+        status: { $ref: '#/components/schemas/StockItemStatus' }
+        costPrice: { type: number }
+        supplierId: { type: integer, nullable: true }
+        receiptId: { type: integer, nullable: true }
+        receivedAt: { type: string, format: date-time, nullable: true }
+        currentRefType: { type: string, nullable: true }
+        currentRefId: { type: integer, nullable: true }
+    MovementType:
+      type: string
+      enum: [IMPORT, EXPORT, RENT, LOAN, RETURN, TRANSFER_OUT, TRANSFER_IN, ADJUST, DAMAGED, WARRANTY, HOLD, RELEASE]
+    StockMovement:
+      type: object
+      properties:
+        id: { type: integer }
+        productId: { type: integer }
+        warehouseId: { type: integer }
+        stockItemId: { type: integer, nullable: true }
+        movementType: { $ref: '#/components/schemas/MovementType' }
+        refType: { type: string, enum: [RECEIPT, EXPORT_SLIP, RENTAL, RENTAL_RETURN, SALES_RETURN, TRANSFER, STOCKTAKE, HOLD, MANUAL] }
+        refId: { type: integer }
+        qtyChange: { type: integer }
+        qtyBefore: { type: integer }
+        qtyAfter: { type: integer }
+        unitCost: { type: number, nullable: true }
+        userId: { type: integer }
+        createdAt: { type: string, format: date-time }
+
+    HoldStatus: { type: string, enum: [ACTIVE, RELEASED, CONSUMED, EXPIRED] }
+    HoldRefType: { type: string, enum: [MANUAL, EXPORT_SLIP, TRANSFER, RENTAL] }
+    Hold:
+      type: object
+      properties:
+        id: { type: integer }
+        productId: { type: integer }
+        warehouseId: { type: integer }
+        stockItemId: { type: integer, nullable: true }
+        serial: { type: string, nullable: true }
+        qty: { type: integer }
+        customerId: { type: integer, nullable: true }
+        customerName: { type: string, nullable: true }
+        heldByUserId: { type: integer }
+        refType: { $ref: '#/components/schemas/HoldRefType' }
+        refId: { type: integer, nullable: true }
+        status: { $ref: '#/components/schemas/HoldStatus' }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    StocktakeStatus: { type: string, enum: [DRAFT, COUNTING, PENDING_APPROVAL, COMPLETED, CANCELLED] }
+    Stocktake:
+      type: object
+      properties:
+        id: { type: integer }
+        code: { type: string, example: PKK-2026-0001 }
+        warehouseId: { type: integer }
+        status: { $ref: '#/components/schemas/StocktakeStatus' }
+        lockTransactions: { type: boolean }
+        createdBy: { type: integer }
+        approvedBy: { type: integer, nullable: true }
+        startedAt: { type: string, format: date-time, nullable: true }
+        completedAt: { type: string, format: date-time, nullable: true }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              productId: { type: integer }
+              systemQty: { type: integer }
+              actualQty: { type: integer, nullable: true }
+              diffQty: { type: integer, nullable: true }
+              scannedSerials: { type: array, items: { type: string } }
+
+    InternalStockLine:
+      type: object
+      required: [productId, qty]
+      properties:
+        productId: { type: integer }
+        qty: { type: integer, minimum: 1 }
+        serials: { type: array, items: { type: string } }
+    InternalStockRequest:
+      type: object
+      required: [warehouseId, refType, refId, userId, lines]
+      properties:
+        warehouseId: { type: integer }
+        refType: { type: string, enum: [RECEIPT, EXPORT_SLIP, RENTAL, RENTAL_RETURN, SALES_RETURN] }
+        refId: { type: integer }
+        userId: { type: integer }
+        lines: { type: array, items: { $ref: '#/components/schemas/InternalStockLine' } }
+
+    TransferStatus:
+      type: string
+      enum: [DRAFT, PENDING, APPROVED, IN_TRANSIT, RECEIVED, DISCREPANCY, COMPLETED, CANCELLED]
+    TransferInput:
+      type: object
+      required: [fromWarehouseId, toWarehouseId, items]
+      properties:
+        fromWarehouseId: { type: integer }
+        toWarehouseId: { type: integer, description: Khác fromWarehouseId }
+        expectedDate: { type: string, format: date }
+        reason: { type: string }
+        note: { type: string }
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [productId, qtySent]
+            properties:
+              productId: { type: integer }
+              qtySent: { type: integer, minimum: 1 }
+              serialsSent: { type: array, items: { type: string } }
+    Transfer:
+      type: object
+      properties:
+        id: { type: integer }
+        code: { type: string, example: PCK-2026-0001 }
+        fromWarehouseId: { type: integer }
+        toWarehouseId: { type: integer }
+        status: { $ref: '#/components/schemas/TransferStatus' }
+        overdue: { type: boolean }
+        createdBy: { type: integer }
+        approvedBy: { type: integer, nullable: true }
+        shippedBy: { type: integer, nullable: true }
+        receivedBy: { type: integer, nullable: true }
+        shippedAt: { type: string, format: date-time, nullable: true }
+        expectedDate: { type: string, format: date, nullable: true }
+        receivedAt: { type: string, format: date-time, nullable: true }
+        shippingMethod: { type: string, enum: [INTERNAL, CARRIER], nullable: true }
+        trackingNo: { type: string, nullable: true }
+        shippingCost: { type: number }
+        totalValue: { type: number, description: Theo giá vốn – dùng cho ngưỡng bỏ qua duyệt }
+        reason: { type: string, nullable: true }
+        rejectReason: { type: string, nullable: true }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              productId: { type: integer }
+              productSnapshot: { type: object, description: 'code, name, unit' }
+              qtySent: { type: integer }
+              qtyReceived: { type: integer, nullable: true }
+              serialsSent: { type: array, items: { type: string } }
+              serialsReceived: { type: array, items: { type: string } }
+              conditionNote: { type: string, nullable: true }
+        discrepancies:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              itemId: { type: integer }
+              qtyDiff: { type: integer }
+              diffType: { type: string, enum: [MISSING, DAMAGED, EXCESS] }
+              resolution: { type: string, enum: [PENDING, RESEND, LOSS, RETURN_TO_SOURCE] }
+              resolvedBy: { type: integer, nullable: true }
+              resolvedAt: { type: string, format: date-time, nullable: true }
+              note: { type: string, nullable: true }
