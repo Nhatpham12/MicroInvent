@@ -18,6 +18,7 @@ import com.microinvent.inventory.domain.StockItem;
 import com.microinvent.inventory.domain.StockMovement;
 import com.microinvent.inventory.domain.Warehouse;
 import com.microinvent.inventory.repository.StockBalanceRepository;
+import com.microinvent.inventory.repository.StockHoldRepository;
 import com.microinvent.inventory.repository.StockItemRepository;
 import com.microinvent.inventory.repository.StockMovementRepository;
 import com.microinvent.inventory.repository.WarehouseRepository;
@@ -42,6 +43,7 @@ class InternalStockServiceTest {
     private StockBalanceRepository balances;
     private StockItemRepository items;
     private StockMovementRepository movements;
+    private StockHoldRepository holds;
     private InternalStockService service;
     /** Dòng tồn giả lập theo productId tại kho 1. */
     private final Map<Integer, StockBalance> stock = new HashMap<>();
@@ -52,7 +54,8 @@ class InternalStockServiceTest {
         balances = mock(StockBalanceRepository.class);
         items = mock(StockItemRepository.class);
         movements = mock(StockMovementRepository.class);
-        service = new InternalStockService(warehouses, balances, items, movements);
+        holds = mock(StockHoldRepository.class);
+        service = new InternalStockService(warehouses, balances, items, movements, holds);
 
         when(warehouses.findById(1)).thenReturn(Optional.of(warehouse(1, Warehouse.Status.ACTIVE, false)));
         when(balances.lock(any(), any())).thenAnswer(inv -> Optional.of(
