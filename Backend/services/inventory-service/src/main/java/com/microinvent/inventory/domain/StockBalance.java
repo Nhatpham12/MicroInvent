@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -55,6 +56,10 @@ public class StockBalance {
     @Version
     @Column(nullable = false)
     private Integer version;
+
+    /** MySQL tự cập nhật (ON UPDATE CURRENT_TIMESTAMP) – chỉ đọc. */
+    @Column(name = "updated_at", insertable = false, updatable = false)
+    private LocalDateTime updatedAt;
 
     /** Khả dụng = tồn thực − giữ − hỏng (SRS 3.10.4). */
     public int available() {

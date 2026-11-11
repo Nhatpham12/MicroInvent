@@ -250,14 +250,15 @@ paths:
     get:
       tags: [Stock]
       summary: Tồn theo (sản phẩm, kho)
+      description: |
+        Lọc theo nhóm sản phẩm chưa hỗ trợ (cần catalog-service). Hàng dưới ngưỡng: dùng `GET /api/v1/stocks/low`.
+        `sort`: `productId`, `warehouseId`, `qtyOnHand`, `updatedAt`.
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
         - $ref: '#/components/parameters/Sort'
         - { name: warehouseId, in: query, schema: { type: integer }, description: Bỏ trống = mọi kho được phép xem }
         - { name: productId, in: query, schema: { type: integer } }
-        - { name: groupId, in: query, schema: { type: integer } }
-        - { name: belowMin, in: query, schema: { type: boolean } }
         - { name: hasStock, in: query, schema: { type: boolean } }
       responses:
         '200':
@@ -890,7 +891,10 @@ paths:
     post:
       tags: [Internal]
       summary: Giữ hàng cho chứng từ (EXPORT_SLIP / RENTAL)
-      description: Chạy trong 1 transaction với `@Lock(PESSIMISTIC_WRITE)` trên stock_balances + Redisson lock theo (tenant, SP, kho). 2 request cùng serial → chỉ 1 thành công (8.5#5).
+      description: |
+        Kiểm đủ tất cả các dòng rồi mới giữ (thiếu 1 dòng → 409 STOCK_NOT_ENOUGH, `details` = các dòng thiếu, không giữ gì).
+        Chứng từ đang có hold ACTIVE → 409 (release trước). Khóa dòng tồn + serial bằng SELECT … FOR UPDATE trong 1
+        transaction: 2 request giữ cùng serial → chỉ 1 thành công (8.5#5).
       security: [{ internalKey: [] }]
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody:
@@ -898,11 +902,16 @@ paths:
         content:
           application/json:
             schema:
-              allOf:
-                - $ref: '#/components/schemas/InternalStockRequest'
-                - properties:
-                    expiresAt: { type: string, format: date-time }
-                    customerId: { type: integer }
+              type: object
+              required: [warehouseId, refType, refId, userId, lines]
+              properties:
+                warehouseId: { type: integer }
+                refType: { type: string, enum: [EXPORT_SLIP, RENTAL] }
+                refId: { type: integer }
+                userId: { type: integer }
+                customerId: { type: integer }
+                expiresAt: { type: string, format: date-time }
+                lines: { type: array, items: { $ref: '#/components/schemas/InternalStockLine' } }
       responses:
         '200': { $ref: '#/components/responses/InternalResult' }
         '409': { $ref: '#/components/responses/StockNotEnough' }
@@ -911,6 +920,10 @@ paths:
     post:
       tags: [Internal]
       summary: Trừ tồn thực theo hold đã giữ (xuất, cho thuê/mượn)
+      description: |
+        Trừ theo **toàn bộ** hold ACTIVE của chứng từ (không gửi dòng hàng). EXPORT_SLIP → `EXPORT` (serial SOLD);
+        RENTAL → `RENT` / `LOAN` (cộng qty_rented_loaned). Không còn hold → 409. `unitCosts` = giá vốn theo serial
+        (nếu toàn bộ là hàng serial) hoặc giá vốn bình quân.
       security: [{ internalKey: [] }]
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody:
@@ -918,10 +931,13 @@ paths:
         content:
           application/json:
             schema:
-              allOf:
-                - $ref: '#/components/schemas/InternalStockRequest'
-                - properties:
-                    movementType: { type: string, enum: [EXPORT, RENT, LOAN, DAMAGED, WARRANTY] }
+              type: object
+              required: [refType, refId, userId, movementType]
+              properties:
+                refType: { type: string, enum: [EXPORT_SLIP, RENTAL] }
+                refId: { type: integer }
+                userId: { type: integer }
+                movementType: { type: string, enum: [EXPORT, RENT, LOAN] }
       responses:
         '200': { $ref: '#/components/responses/InternalResult' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -1257,7 +1273,7 @@ components:
       required: [warehouseId, refType, refId, userId, lines]
       properties:
         warehouseId: { type: integer }
-        refType: { type: string, enum: [RECEIPT, EXPORT_SLIP, RENTAL, RENTAL_RETURN, SALES_RETURN] }
+        refType: { type: string, enum: [RECEIPT, RENTAL_RETURN, SALES_RETURN], description: Dùng cho /internal/stock/receive }
         refId: { type: integer }
         userId: { type: integer }
         lines: { type: array, items: { $ref: '#/components/schemas/InternalStockLine' } }
