@@ -1,13 +1,14 @@
 package com.microinvent.inventory.repository;
 
 import com.microinvent.inventory.domain.Warehouse;
+import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 
 public interface WarehouseRepository extends JpaRepository<Warehouse, Integer> {
@@ -29,9 +30,15 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, Integer> {
     Page<Warehouse> search(Warehouse.Type type, Warehouse.Status status, String keyword, boolean allWarehouses,
             Collection<Integer> ids, Pageable pageable);
 
-    @Modifying
-    @Query("UPDATE Warehouse w SET w.defaultWarehouse = FALSE WHERE w.defaultWarehouse = TRUE AND w.id <> :id")
-    int clearDefaultExcept(Integer id);
+    boolean existsByDefaultWarehouseTrue();
+
+    /**
+     * Khóa mọi dòng kho (SELECT … FOR UPDATE, theo thứ tự id) để các lần đổi kho mặc định chạy tuần tự –
+     * tránh 2 request đồng thời làm 2 kho cùng is_default. Bảng kho chỉ vài chục dòng nên khóa cả bảng là đủ.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT w FROM Warehouse w ORDER BY w.id")
+    List<Warehouse> findAllForUpdate();
 
     /** Tổng tồn thực và giá trị tồn (theo giá vốn bình quân) của các kho. */
     @Query(value = """
@@ -48,10 +55,6 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, Integer> {
     @Query(value = "SELECT COALESCE(SUM(qty_on_hand), 0) FROM stock_balances WHERE warehouse_id = :id",
             nativeQuery = true)
     long sumOnHand(Integer id);
-
-    @Query(value = "SELECT COALESCE(SUM(qty_in_transit_in), 0) FROM stock_balances WHERE warehouse_id = :id",
-            nativeQuery = true)
-    long sumInTransitIn(Integer id);
 
     @Query(value = "SELECT COALESCE(SUM(qty_rented_loaned), 0) FROM stock_balances WHERE warehouse_id = :id",
             nativeQuery = true)
