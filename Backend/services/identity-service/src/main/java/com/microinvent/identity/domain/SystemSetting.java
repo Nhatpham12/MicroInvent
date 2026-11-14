@@ -26,6 +26,6 @@ public class SystemSetting {
     @Column(name = "updated_by")
     private Integer updatedBy;
 
-    @Column(name = "updated_at", insertable = false, updatable = false)
+    @Column(name = "updated_at", insertable = false)
     private LocalDateTime updatedAt;
 }

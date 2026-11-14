@@ -5,6 +5,7 @@ import com.microinvent.common.security.JsonAuthErrorHandlers;
 import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -41,6 +42,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_PATHS).permitAll()
                         .requestMatchers("/api/v1/users/**", "/api/v1/roles/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/settings").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers("/api/v1/settings/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .build();
     }
