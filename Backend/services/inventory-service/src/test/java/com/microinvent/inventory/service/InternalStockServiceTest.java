@@ -164,6 +164,69 @@ class InternalStockServiceTest {
     }
 
     @Test
+    void reverseUndoesReceiptAndDeletesSerials() {
+        stock.put(1, balance(1, 1, 3, "150.00"));
+        StockItem a = serialItem(11L, "SN-A", StockItem.Status.AVAILABLE, 100);
+        StockItem b = serialItem(12L, "SN-B", StockItem.Status.AVAILABLE, 100);
+        when(items.lockBySerials(anyCollection())).thenReturn(List.of(a, b));
+        when(movements.netQtyOfRef(StockMovement.RefType.RECEIPT, 100, 1, 1)).thenReturn(2L);
+
+        StockResult res = service.reverse(receive(StockMovement.RefType.RECEIPT,
+                line(1, 2, List.of("SN-A", "SN-B"), "200", Condition.GOOD)));
+
+        assertThat(stock.get(1).getQtyOnHand()).isEqualTo(1);
+        assertThat(stock.get(1).getAvgCost()).isEqualByComparingTo("50.00");
+        assertThat(res.movements().get(0).qtyChange()).isEqualTo(-2);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<StockItem>> deleted = ArgumentCaptor.forClass(List.class);
+        verify(items).deleteAll(deleted.capture());
+        assertThat(deleted.getValue()).containsExactlyInAnyOrder(a, b);
+    }
+
+    @Test
+    void reverseIsBlockedWhenGoodsWereUsedOrAlreadyReversed() {
+        StockBalance bal = balance(5, 1, 10, "20");
+        bal.setQtyHold(9);
+        stock.put(5, bal);
+        when(movements.netQtyOfRef(StockMovement.RefType.RECEIPT, 100, 5, 1)).thenReturn(10L);
+        assertThatThrownBy(() -> service.reverse(receive(StockMovement.RefType.RECEIPT, line(5, 2, null, "20", null))))
+                .extracting("code").isEqualTo(ErrorCode.CONFLICT);
+
+        bal.setQtyHold(0);
+        when(movements.netQtyOfRef(StockMovement.RefType.RECEIPT, 100, 5, 1)).thenReturn(0L);
+        assertThatThrownBy(() -> service.reverse(receive(StockMovement.RefType.RECEIPT, line(5, 2, null, "20", null))))
+                .extracting("code").isEqualTo(ErrorCode.CONFLICT);
+        assertThat(bal.getQtyOnHand()).isEqualTo(10);
+        verify(movements, never()).save(any());
+    }
+
+    @Test
+    void reverseRejectsSoldOrPreviouslyHeldSerial() {
+        stock.put(1, balance(1, 1, 2, "100"));
+        when(movements.netQtyOfRef(StockMovement.RefType.RECEIPT, 100, 1, 1)).thenReturn(2L);
+        when(items.lockBySerials(anyCollection()))
+                .thenReturn(List.of(serialItem(11L, "SN-A", StockItem.Status.SOLD, 100)));
+        assertThatThrownBy(() -> service.reverse(receive(StockMovement.RefType.RECEIPT,
+                line(1, 1, List.of("SN-A"), "100", null)))).extracting("code").isEqualTo(ErrorCode.CONFLICT);
+
+        when(items.lockBySerials(anyCollection()))
+                .thenReturn(List.of(serialItem(11L, "SN-A", StockItem.Status.AVAILABLE, 100)));
+        when(holds.existsByStockItemIdIn(List.of(11L))).thenReturn(true);
+        assertThatThrownBy(() -> service.reverse(receive(StockMovement.RefType.RECEIPT,
+                line(1, 1, List.of("SN-A"), "100", null)))).extracting("code").isEqualTo(ErrorCode.CONFLICT);
+        verify(items, never()).deleteAll(any());
+    }
+
+    @Test
+    void weightedAverageAfterRemovalRevertsReceipt() {
+        // 10 cái giá 100 + nhập 10 cái giá 200 → TB 150; đảo 10 cái giá 200 → về lại 100
+        assertThat(InternalStockService.weightedAverageAfterRemoval(new BigDecimal("150"), 20, new BigDecimal("200"), 10))
+                .isEqualByComparingTo("100.00");
+        assertThat(InternalStockService.weightedAverageAfterRemoval(new BigDecimal("150"), 10, new BigDecimal("200"), 10))
+                .isEqualByComparingTo("150");
+    }
+
+    @Test
     void weightedAverageHandlesEmptyStock() {
         assertThat(InternalStockService.weightedAverage(BigDecimal.ZERO, 0, new BigDecimal("99.99"), 3))
                 .isEqualByComparingTo("99.99");
@@ -178,6 +241,17 @@ class InternalStockServiceTest {
     private static StockReceiveRequest.Line line(int productId, int qty, List<String> serials, String unitCost,
             Condition condition) {
         return new StockReceiveRequest.Line(productId, qty, serials, new BigDecimal(unitCost), null, condition);
+    }
+
+    private static StockItem serialItem(Long id, String serial, StockItem.Status status, int receiptId) {
+        StockItem i = new StockItem();
+        i.setId(id);
+        i.setProductId(1);
+        i.setWarehouseId(1);
+        i.setSerial(serial);
+        i.setStatus(status);
+        i.setReceiptId(receiptId);
+        return i;
     }
 
     private static StockBalance balance(int productId, int warehouseId, int onHand, String avgCost) {
