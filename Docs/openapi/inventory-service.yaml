@@ -965,7 +965,11 @@ paths:
     post:
       tags: [Internal]
       summary: Ánh xạ ngược tồn khi sửa / hủy phiếu nhập đã xác nhận
-      description: Không cho đảo nếu serial của phiếu đã rời trạng thái AVAILABLE → 409 STOCK_ALREADY_USED.
+      description: |
+        Gửi **đúng body đã gửi cho receive** (cùng refType, refId, warehouseId, các dòng, serial, đơn giá).
+        Kiểm hết các dòng rồi mới trừ; 409 CONFLICT (`details` = danh sách lý do) khi: đảo nhiều hơn số chứng từ còn lại
+        (gọi đảo lần 2), hàng đã bị giữ / xuất, serial không còn nguyên trong kho theo phiếu, hoặc serial đã từng được giữ
+        cho chứng từ khác. Đảo xong serial bị xóa để sửa phiếu có thể nhập lại cùng serial.
       security: [{ internalKey: [] }]
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody:
