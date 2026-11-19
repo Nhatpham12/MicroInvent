@@ -1,5 +1,6 @@
 package com.microinvent.identity.domain;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -67,7 +68,8 @@ public class User {
     @Column(name = "updated_at", insertable = false, updatable = false)
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    /** Thêm/bớt trực tiếp trên collection (cascade + orphanRemoval), xem UserService.assignWarehouses. */
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<UserWarehouse> warehouses = new HashSet<>();
 
     public boolean isLocked(LocalDateTime now) {

@@ -188,7 +188,7 @@ public class AuthService {
     }
 
     /** bcrypt của một chuỗi ngẫu nhiên, chỉ dùng để cân bằng thời gian khi user không tồn tại. */
-    private static final String DUMMY_HASH = "$2a$10$qKMHjviQUSibJZgxUyU0heG/6LKB1k/TCtNfZXxXP4zLRGvGC24Sm";
+    static final String DUMMY_HASH = "$2a$10$qKMHjviQUSibJZgxUyU0heG/6LKB1k/TCtNfZXxXP4zLRGvGC24Sm";
 
     /** IP + User-Agent của client (gateway chuyển qua X-Forwarded-For). */
     public record ClientInfo(String ip, String userAgent) {
