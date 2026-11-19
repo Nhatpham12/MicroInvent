@@ -7,6 +7,10 @@ spring:
     name: catalog-service
   flyway:
     enabled: false   # tenant-starter tự chạy Flyway cho từng tenant
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   jpa:
     open-in-view: false
     hibernate:
@@ -35,3 +39,11 @@ microinvent:
   internal:
     # Bắt buộc đặt INTERNAL_API_KEY; thiếu thì service không khởi động.
     api-key: ${INTERNAL_API_KEY}
+  catalog:
+    # Khóa AES-256 (base64, 32 byte) mã hóa STK NCC / CCCD khách. Sinh: openssl rand -base64 32.
+    # Bắt buộc đặt CATALOG_ENCRYPTION_KEY; thiếu thì service không khởi động. MẤT KHÓA = MẤT DỮ LIỆU ĐÃ MÃ HÓA.
+    encryption-key: ${CATALOG_ENCRYPTION_KEY}
+    image-dir: ${CATALOG_IMAGE_DIR:./data/product-images}
+    max-image-size: 2MB
+    max-import-rows: 2000
+    max-export-rows: 10000

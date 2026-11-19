@@ -2,3 +2,6 @@
 microinvent:
   internal:
     api-key: ${INTERNAL_API_KEY:dev-only-internal-key}
+  catalog:
+    # Khóa dev cố định (32 byte base64). KHÔNG dùng cho môi trường thật.
+    encryption-key: ${CATALOG_ENCRYPTION_KEY:ZGV2LW9ubHktY2F0YWxvZy1hZXMta2V5LTMyLWJ5dGU=}
