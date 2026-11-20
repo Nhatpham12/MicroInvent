@@ -2,6 +2,7 @@ package com.microinvent.report.messaging;
 
 import com.microinvent.common.context.TenantContext;
 import com.microinvent.common.event.DomainEvent;
+import com.microinvent.common.exception.BusinessException;
 import com.microinvent.report.config.AuditQueueConfig;
 import com.microinvent.report.service.AuditLogWriter;
 import org.slf4j.Logger;
@@ -23,6 +24,15 @@ public class AuditLogListener {
         this.writer = writer;
     }
 
+    private static boolean hasBusinessCause(Throwable ex) {
+        for (Throwable t = ex; t != null; t = t.getCause()) {
+            if (t instanceof BusinessException) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @RabbitListener(queues = AuditQueueConfig.AUDIT_QUEUE)
     public void onAuditLog(DomainEvent event) {
         if (event == null || !StringUtils.hasText(event.eventId()) || !StringUtils.hasText(event.tenantId())) {
@@ -36,6 +46,12 @@ public class AuditLogListener {
             }
         } catch (IllegalArgumentException ex) {
             throw new AmqpRejectAndDontRequeueException(ex.getMessage(), ex);
+        } catch (RuntimeException ex) {
+            // Tenant lạ (TENANT_NOT_FOUND, thường bị Spring bọc trong lỗi lấy kết nối) → không retry, vào DLQ.
+            if (hasBusinessCause(ex)) {
+                throw new AmqpRejectAndDontRequeueException(ex.getMessage(), ex);
+            }
+            throw ex;
         } finally {
             TenantContext.clear();
         }
