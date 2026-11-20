@@ -140,6 +140,13 @@ class StockQueryServiceTest {
                 .satisfies(l -> assertThat(List.of(l.available(), l.minStock(), l.shortage())).containsExactly(7, 20, 13));
     }
 
+    @Test
+    void serialKeywordEscapesLikeWildcards() {
+        assertThat(StockQueryService.likePattern(" SN_01% ")).isEqualTo("%sn!_01!%%");
+        assertThat(StockQueryService.likePattern("a!b")).isEqualTo("%a!!b%");
+        assertThat(StockQueryService.likePattern("  ")).isNull();
+    }
+
     private static StockBalance balance(int warehouseId, int onHand, int hold, int damaged) {
         StockBalance b = new StockBalance();
         b.setProductId(9);

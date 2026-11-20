@@ -16,13 +16,16 @@ public interface StockItemRepository extends JpaRepository<StockItem, Long> {
     /** Serial đã có trong hệ thống (ở bất kỳ kho / trạng thái nào). */
     Optional<StockItem> findBySerial(String serial);
 
-    /** Đơn vị có serial đang nằm trong các kho được xem; lọc sản phẩm / trạng thái / một phần serial. */
+    /**
+     * Đơn vị có serial đang nằm trong các kho được xem; lọc sản phẩm / trạng thái / một phần serial.
+     * {@code keyword} đã chuẩn hóa dạng "%abc%" chữ thường, ký tự đại diện đã thoát bằng '!'.
+     */
     @Query("""
             SELECT i FROM StockItem i
             WHERE (:allWarehouses = TRUE OR i.warehouseId IN :ids OR i.lastWarehouseId IN :ids)
               AND (:productId IS NULL OR i.productId = :productId)
               AND (:status IS NULL OR i.status = :status)
-              AND (:keyword IS NULL OR LOWER(i.serial) LIKE LOWER(CONCAT('%', :keyword, '%')))
+              AND (:keyword IS NULL OR LOWER(i.serial) LIKE :keyword ESCAPE '!')
             """)
     Page<StockItem> search(boolean allWarehouses, Collection<Integer> ids, Integer productId, StockItem.Status status,
             String keyword, Pageable pageable);
