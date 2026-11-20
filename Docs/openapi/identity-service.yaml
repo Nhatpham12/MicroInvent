@@ -1,0 +1,1048 @@
+# identity-service – SINH TỰ ĐỘNG từ springdoc (GET /v3/api-docs của service, profile dev), 20/11/2026.
+# Sinh lại khi đổi API: chạy service rồi tải http://localhost:<port>/v3/api-docs, đổi servers về gateway.
+openapi: 3.1.0
+info:
+  title: MicroInvent – identity-service
+  version: v1
+servers:
+- url: http://localhost:8080
+  description: api-gateway
+security:
+- bearerAuth: []
+paths:
+  /api/v1/users/{id}:
+    get:
+      tags:
+      - Users
+      summary: Chi tiết người dùng + kho được gán
+      operationId: get
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseUserDetailResponse'
+    put:
+      tags:
+      - Users
+      summary: Cập nhật thông tin, vai trò (không đổi tên đăng nhập)
+      operationId: update
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseUserDetailResponse'
+  /api/v1/users/{id}/warehouses:
+    put:
+      tags:
+      - Users
+      summary: Gán danh sách kho + quyền ghi + kho mặc định (thay toàn bộ)
+      operationId: assignWarehouses
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignWarehousesRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseUserDetailResponse'
+  /api/v1/settings:
+    get:
+      tags:
+      - Settings
+      summary: Đọc cấu hình hệ thống (số ngày giữ hàng, ngưỡng duyệt chuyển kho...)
+      operationId: list
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseListSettingResponse'
+    put:
+      tags:
+      - Settings
+      summary: Cập nhật cấu hình (chỉ key đã có, giá trị số nguyên không âm)
+      operationId: update_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSettingsRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseListSettingResponse'
+  /api/v1/auth/me/default-warehouse:
+    put:
+      tags:
+      - Auth
+      summary: Đổi kho mặc định / kho đang làm việc (phải là kho được gán, trừ vai trò xem mọi kho)
+      operationId: changeDefaultWarehouse
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DefaultWarehouseRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseMeResponse'
+  /api/v1/auth/change-password:
+    put:
+      tags:
+      - Auth
+      summary: Đổi mật khẩu (cần mật khẩu hiện tại; đăng xuất mọi thiết bị)
+      operationId: changePassword
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+  /api/v1/users:
+    get:
+      tags:
+      - Users
+      summary: Danh sách người dùng (lọc vai trò, kho, trạng thái, tìm kiếm, phân trang)
+      operationId: list_1
+      parameters:
+      - name: keyword
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: role
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: active
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - name: warehouseId
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponsePageResponseUserSummaryResponse'
+    post:
+      tags:
+      - Users
+      summary: Tạo người dùng
+      operationId: create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseUserDetailResponse'
+  /api/v1/users/{id}/reset-password:
+    post:
+      tags:
+      - Users
+      summary: Admin đặt lại mật khẩu (đăng xuất mọi thiết bị của người dùng)
+      operationId: resetPassword
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminResetPasswordRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+  /api/v1/auth/verify-otp:
+    post:
+      tags:
+      - Auth
+      summary: Xác thực OTP, trả reset token dùng 1 lần (sai 5 lần thì OTP bị hủy)
+      operationId: verifyOtp
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyOtpRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseResetTokenResponse'
+  /api/v1/auth/reset-password:
+    post:
+      tags:
+      - Auth
+      summary: Đặt lại mật khẩu bằng reset token (đăng xuất mọi thiết bị)
+      operationId: resetPassword_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+  /api/v1/auth/refresh:
+    post:
+      tags:
+      - Auth
+      summary: Cấp lại access token từ refresh token (refresh token cũ bị thu hồi)
+      operationId: refresh
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseTokenResponse'
+  /api/v1/auth/logout:
+    post:
+      tags:
+      - Auth
+      summary: 'Đăng xuất: thu hồi refresh token'
+      operationId: logout
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+  /api/v1/auth/login:
+    post:
+      tags:
+      - Auth
+      summary: Đăng nhập bằng username/email + mật khẩu (khóa 5 phút sau 5 lần sai)
+      operationId: login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseTokenResponse'
+  /api/v1/auth/forgot-password:
+    post:
+      tags:
+      - Auth
+      summary: 'Quên mật khẩu: gửi OTP 6 số về email (luôn trả OK để không lộ tài khoản)'
+      operationId: forgotPassword
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+  /api/v1/users/{id}/status:
+    patch:
+      tags:
+      - Users
+      summary: Vô hiệu hóa / kích hoạt, mở khóa đăng nhập
+      operationId: changeStatus
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserStatusRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseUserDetailResponse'
+  /internal/users/{id}/scope:
+    get:
+      tags:
+      - Internal
+      summary: Phạm vi kho + quyền của user
+      operationId: scope
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseUserScopeResponse'
+  /health:
+    get:
+      tags:
+      - health-controller
+      operationId: health
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseMapStringObject'
+  /api/v1/users/stats/access:
+    get:
+      tags:
+      - Users
+      summary: Lượng truy cập theo tháng (từ login_histories), mặc định năm hiện tại
+      operationId: accessStats
+      parameters:
+      - name: year
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseAccessStatsResponse'
+  /api/v1/roles:
+    get:
+      tags:
+      - Roles
+      summary: Danh sách vai trò & quyền
+      operationId: list_2
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseListRoleResponse'
+  /api/v1/auth/me:
+    get:
+      tags:
+      - Auth
+      summary: Thông tin người dùng hiện tại, vai trò, quyền, kho được gán
+      operationId: me
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseMeResponse'
+components:
+  schemas:
+    UpdateUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          minLength: 0
+        fullName:
+          type: string
+          maxLength: 100
+          minLength: 0
+        phone:
+          type: string
+          maxLength: 20
+          minLength: 0
+          pattern: ^[0-9+\-\s]*$
+        role:
+          type: string
+          maxLength: 30
+          minLength: 0
+      required:
+      - email
+      - fullName
+      - role
+    ApiError:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details: {}
+    ApiResponseUserDetailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/UserDetailResponse'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    UserDetailResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        username:
+          type: string
+        email:
+          type: string
+        fullName:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+        roleName:
+          type: string
+        allWarehouses:
+          type: boolean
+        active:
+          type: boolean
+        locked:
+          type: boolean
+        lockedUntil:
+          type: string
+          format: date-time
+        warehouses:
+          type: array
+          items:
+            $ref: '#/components/schemas/WarehouseAccess'
+        defaultWarehouseId:
+          type: integer
+          format: int32
+        lastLoginAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    WarehouseAccess:
+      type: object
+      properties:
+        warehouseId:
+          type: integer
+          format: int32
+        canWrite:
+          type: boolean
+    AssignWarehousesRequest:
+      type: object
+      properties:
+        warehouses:
+          type: array
+          items:
+            $ref: '#/components/schemas/WarehouseAccessRequest'
+          maxItems: 100
+          minItems: 0
+        defaultWarehouseId:
+          type: integer
+          format: int32
+      required:
+      - warehouses
+    WarehouseAccessRequest:
+      type: object
+      properties:
+        warehouseId:
+          type: integer
+          format: int32
+        canWrite:
+          type: boolean
+      required:
+      - warehouseId
+    UpdateSettingsRequest:
+      type: object
+      properties:
+        settings:
+          type: object
+          additionalProperties:
+            type: string
+          minProperties: 1
+      required:
+      - settings
+    ApiResponseListSettingResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingResponse'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    SettingResponse:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+        description:
+          type: string
+        updatedBy:
+          type: integer
+          format: int32
+        updatedAt:
+          type: string
+          format: date-time
+    DefaultWarehouseRequest:
+      type: object
+      properties:
+        warehouseId:
+          type: integer
+          format: int32
+      required:
+      - warehouseId
+    ApiResponseMeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/MeResponse'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    MeResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        username:
+          type: string
+        email:
+          type: string
+        fullName:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+        roleName:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+        allWarehouses:
+          type: boolean
+        warehouses:
+          type: array
+          items:
+            $ref: '#/components/schemas/WarehouseAccess'
+        defaultWarehouseId:
+          type: integer
+          format: int32
+        lastLoginAt:
+          type: string
+          format: date-time
+    ChangePasswordRequest:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+          maxLength: 100
+          minLength: 0
+        newPassword:
+          type: string
+          minLength: 1
+          pattern: ^(?=.*[A-Za-z])(?=.*\d).{8,100}$
+      required:
+      - currentPassword
+      - newPassword
+    ApiResponseVoid:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data: {}
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    CreateUserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          maxLength: 50
+          minLength: 3
+          pattern: ^[A-Za-z0-9._\-]+$
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          minLength: 0
+        fullName:
+          type: string
+          maxLength: 100
+          minLength: 0
+        phone:
+          type: string
+          maxLength: 20
+          minLength: 0
+          pattern: ^[0-9+\-\s]*$
+        role:
+          type: string
+          maxLength: 30
+          minLength: 0
+        password:
+          type: string
+          minLength: 1
+          pattern: ^(?=.*[A-Za-z])(?=.*\d).{8,100}$
+        warehouses:
+          type: array
+          items:
+            $ref: '#/components/schemas/WarehouseAccessRequest'
+          maxItems: 100
+          minItems: 0
+        defaultWarehouseId:
+          type: integer
+          format: int32
+      required:
+      - email
+      - fullName
+      - password
+      - role
+      - username
+    AdminResetPasswordRequest:
+      type: object
+      properties:
+        newPassword:
+          type: string
+          minLength: 1
+          pattern: ^(?=.*[A-Za-z])(?=.*\d).{8,100}$
+      required:
+      - newPassword
+    VerifyOtpRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          maxLength: 100
+          minLength: 0
+        otp:
+          type: string
+          minLength: 1
+          pattern: ^\d{6}$
+      required:
+      - email
+      - otp
+    ApiResponseResetTokenResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/ResetTokenResponse'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    ResetTokenResponse:
+      type: object
+      properties:
+        resetToken:
+          type: string
+        expiresIn:
+          type: integer
+          format: int64
+    ResetPasswordRequest:
+      type: object
+      properties:
+        resetToken:
+          type: string
+          maxLength: 100
+          minLength: 0
+        newPassword:
+          type: string
+          minLength: 1
+          pattern: ^(?=.*[A-Za-z])(?=.*\d).{8,100}$
+      required:
+      - newPassword
+      - resetToken
+    RefreshRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          minLength: 1
+      required:
+      - refreshToken
+    ApiResponseTokenResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/TokenResponse'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    TokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        tokenType:
+          type: string
+        expiresIn:
+          type: integer
+          format: int64
+        user:
+          $ref: '#/components/schemas/MeResponse'
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          maxLength: 100
+          minLength: 0
+        password:
+          type: string
+          maxLength: 100
+          minLength: 0
+      required:
+      - password
+      - username
+    ForgotPasswordRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          maxLength: 100
+          minLength: 0
+      required:
+      - email
+    UserStatusRequest:
+      type: object
+      properties:
+        active:
+          type: boolean
+        unlock:
+          type: boolean
+        anyChange:
+          type: boolean
+    ApiResponseUserScopeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/UserScopeResponse'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    UserScopeResponse:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int32
+        username:
+          type: string
+        active:
+          type: boolean
+        role:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+        allWarehouses:
+          type: boolean
+        warehouses:
+          type: array
+          items:
+            $ref: '#/components/schemas/WarehouseAccess'
+        defaultWarehouseId:
+          type: integer
+          format: int32
+    ApiResponseMapStringObject:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          additionalProperties: {}
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    ApiResponsePageResponseUserSummaryResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/PageResponseUserSummaryResponse'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    PageResponseUserSummaryResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserSummaryResponse'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    UserSummaryResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        username:
+          type: string
+        email:
+          type: string
+        fullName:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+        roleName:
+          type: string
+        active:
+          type: boolean
+        locked:
+          type: boolean
+        lockedUntil:
+          type: string
+          format: date-time
+        defaultWarehouseId:
+          type: integer
+          format: int32
+        lastLoginAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    AccessStatsResponse:
+      type: object
+      properties:
+        year:
+          type: integer
+          format: int32
+        months:
+          type: array
+          items:
+            $ref: '#/components/schemas/Month'
+    ApiResponseAccessStatsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/AccessStatsResponse'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    Month:
+      type: object
+      properties:
+        month:
+          type: integer
+          format: int32
+        successCount:
+          type: integer
+          format: int64
+        failedCount:
+          type: integer
+          format: int64
+        activeUsers:
+          type: integer
+          format: int64
+    ApiResponseListRoleResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoleResponse'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    PermissionResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        description:
+          type: string
+    RoleResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        code:
+          type: string
+        name:
+          type: string
+        allWarehouses:
+          type: boolean
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissionResponse'
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
