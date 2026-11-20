@@ -1,0 +1,14 @@
+flowchart TD
+  A["Thủ kho mở Phiếu nhập"] --> B["Bấm Tạo phiếu"]
+  B --> C["Chọn kho nhận và nhà cung cấp"]
+  C --> D["Thêm dòng sản phẩm: số lượng, đơn giá"]
+  D --> E{"Sản phẩm có serial?"}
+  E -->|Có| F["Quét hoặc nhập serial"]
+  E -->|Không| J["Lưu nháp"]
+  F --> H{"Serial trùng?"}
+  H -->|Trùng| I["Báo lỗi, nhập lại"] --> F
+  H -->|Không| J
+  J --> K["Xác nhận phiếu"]
+  K --> L["Tồn kho nhận tăng, phiếu chuyển sang Đã xác nhận"]
+  L --> N["In phiếu PDF"]
+  J --> M["Hủy phiếu"]

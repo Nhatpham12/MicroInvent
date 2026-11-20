@@ -1,0 +1,34 @@
+flowchart TD
+  LOGIN["Đăng nhập"] --> FORGOT["Quên mật khẩu: email, OTP, mật khẩu mới"]
+  LOGIN --> APP["Khung chung: header chọn kho, chuông, tài khoản + sidebar theo vai trò"]
+
+  APP --> DASH["Dashboard"]
+  APP --> DM
+  APP --> NV
+  APP --> BC["Báo cáo: tồn kho, nhập/xuất, doanh thu, cho thuê, lợi nhuận, chuyển kho, so sánh kho"]
+  APP --> TB["Trung tâm thông báo"]
+  APP --> QT
+
+  subgraph DM["Danh mục"]
+    SP["Sản phẩm"]
+    NSP["Nhóm sản phẩm"]
+    NCC["Nhà cung cấp"]
+    KH["Khách hàng"]
+  end
+
+  subgraph NV["Nghiệp vụ"]
+    NHAP["Phiếu nhập"]
+    XUAT["Phiếu xuất"]
+    HOLD["Giữ hàng"]
+    CK["Chuyển kho: đi, đến, nhận, sai lệch"]
+    THUE["Thuê / mượn + trả"]
+    DT["Đổi / trả hàng"]
+    KK["Kiểm kê"]
+    TT["Thanh toán, công nợ, bảo hành"]
+  end
+
+  subgraph QT["Quản trị - Admin"]
+    KHO["Danh mục kho"]
+    USER["Người dùng + phân quyền kho"]
+    CFG["Cấu hình, nhật ký thao tác, backup"]
+  end
