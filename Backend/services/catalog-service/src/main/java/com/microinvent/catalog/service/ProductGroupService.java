@@ -8,6 +8,7 @@ import com.microinvent.common.exception.BusinessException;
 import com.microinvent.common.exception.ErrorCode;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -18,9 +19,11 @@ import org.springframework.util.StringUtils;
 public class ProductGroupService {
 
     private final ProductGroupRepository repository;
+    private final CatalogAudit audit;
 
-    public ProductGroupService(ProductGroupRepository repository) {
+    public ProductGroupService(ProductGroupRepository repository, CatalogAudit audit) {
         this.repository = repository;
+        this.audit = audit;
     }
 
     @Transactional(readOnly = true)
@@ -43,7 +46,9 @@ public class ProductGroupService {
         ProductGroup g = new ProductGroup();
         g.setCode(code);
         apply(g, req);
-        return toResponse(repository.save(g), 0);
+        ProductGroup saved = repository.save(g);
+        audit.record("CREATE", "PRODUCT_GROUP", saved.getId(), null, snapshot(saved));
+        return toResponse(saved, 0);
     }
 
     public ProductGroupResponse update(Integer id, ProductGroupRequest req) {
@@ -52,7 +57,9 @@ public class ProductGroupService {
             throw new BusinessException(ErrorCode.CONFLICT, "Tên nhóm đã tồn tại");
         }
         // Mã nhóm không đổi sau khi tạo (đã dùng trong chứng từ/báo cáo).
+        Map<String, Object> before = snapshot(g);
         apply(g, req);
+        audit.record("UPDATE", "PRODUCT_GROUP", id, before, snapshot(g));
         return toResponse(g, repository.countActiveProducts(id));
     }
 
@@ -64,6 +71,11 @@ public class ProductGroupService {
             throw new BusinessException(ErrorCode.CONFLICT, "Nhóm còn " + products + " sản phẩm, không thể xóa");
         }
         g.setDeleted(true);
+        audit.record("DELETE", "PRODUCT_GROUP", id, snapshot(g), null);
+    }
+
+    private static Map<String, Object> snapshot(ProductGroup g) {
+        return CatalogAudit.snapshot("code", g.getCode(), "name", g.getName());
     }
 
     private ProductGroup get(Integer id) {

@@ -11,6 +11,11 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 6MB
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
   jpa:
     open-in-view: false
     hibernate:
@@ -36,6 +41,9 @@ microinvent:
     url-template: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/catalog_%s?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Ho_Chi_Minh
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:root}
+  outbox:
+    # Event audit.log ghi vào outbox_events cùng transaction, job đẩy lên RabbitMQ mỗi 2 giây
+    enabled: true
   internal:
     # Bắt buộc đặt INTERNAL_API_KEY; thiếu thì service không khởi động.
     api-key: ${INTERNAL_API_KEY}
