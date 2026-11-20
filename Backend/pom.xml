@@ -38,6 +38,7 @@
 		<springdoc.version>2.8.17</springdoc.version>
 		<jjwt.version>0.13.0</jjwt.version>
 		<mapstruct.version>1.6.3</mapstruct.version>
+		<poi.version>5.4.1</poi.version>
 	</properties>
 
 	<dependencyManagement>
@@ -93,6 +94,11 @@
 				<groupId>org.mapstruct</groupId>
 				<artifactId>mapstruct</artifactId>
 				<version>${mapstruct.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.poi</groupId>
+				<artifactId>poi-ooxml</artifactId>
+				<version>${poi.version}</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>

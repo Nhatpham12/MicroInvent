@@ -12,6 +12,9 @@ public interface ProductGroupRepository extends JpaRepository<ProductGroup, Inte
 
     boolean existsByCodeIgnoreCase(String code);
 
+    /** Nhập Excel: tra nhóm theo mã. */
+    List<ProductGroup> findByDeletedFalse();
+
     boolean existsByNameIgnoreCaseAndDeletedFalse(String name);
 
     boolean existsByNameIgnoreCaseAndDeletedFalseAndIdNot(String name, Integer id);

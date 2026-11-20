@@ -87,6 +87,11 @@ public class ProductService {
     private void apply(Product p, ProductRequest req) {
         ProductGroup group = groups.findByIdAndDeletedFalse(req.groupId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.BAD_REQUEST, "Nhóm sản phẩm không tồn tại"));
+        fill(p, req, group);
+    }
+
+    /** Gán các trường sửa được (dùng chung cho API và nhập Excel). */
+    static void fill(Product p, ProductRequest req, ProductGroup group) {
         p.setGroup(group);
         p.setName(req.name().trim());
         p.setUnit(req.unit().trim());

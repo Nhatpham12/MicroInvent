@@ -101,6 +101,10 @@ services:
         MODULE: services/catalog-service
     image: microinvent/catalog-service
     env_file: .env
+    environment:
+      CATALOG_IMAGE_DIR: /data/product-images
+    volumes:
+      - catalog-images:/data/product-images
     depends_on:
       mysql:
         condition: service_healthy
@@ -212,3 +216,4 @@ services:
 
 volumes:
   mysql-data:
+  catalog-images:

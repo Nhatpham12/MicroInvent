@@ -95,7 +95,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             String token = auth.substring(BEARER.length()).trim();
             return token.isEmpty() ? null : token;
         }
-        if (exchange.getRequest().getPath().value().startsWith("/ws/")) {
+        String path = exchange.getRequest().getPath().value();
+        if (path.equals("/ws") || path.startsWith("/ws/")) {
             return exchange.getRequest().getQueryParams().getFirst("access_token");
         }
         return null;

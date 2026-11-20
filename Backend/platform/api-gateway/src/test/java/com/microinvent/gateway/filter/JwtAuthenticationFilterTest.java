@@ -109,4 +109,12 @@ class JwtAuthenticationFilterTest {
         run(MockServerHttpRequest.get("/ws/notifications?access_token=" + token));
         assertThat(forwarded.get().getHeaders().getFirst(HeaderNames.USER_ID)).isEqualTo("1");
     }
+
+    @Test
+    void websocketEndpointWithoutTrailingSlashAcceptsTokenFromQuery() {
+        String token = jwt.issueAccessToken(new JwtPrincipal(7L, "thukho", "tigernet", Set.of("STOREKEEPER"), null,
+                false));
+        run(MockServerHttpRequest.get("/ws?access_token=" + token));
+        assertThat(forwarded.get().getHeaders().getFirst(HeaderNames.USER_ID)).isEqualTo("7");
+    }
 }
