@@ -2,12 +2,15 @@ package com.microinvent.inventory.repository;
 
 import com.microinvent.inventory.domain.StockHold;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 
 public interface StockHoldRepository extends JpaRepository<StockHold, Long> {
+
+    boolean existsByStockItemIdIn(Collection<Long> stockItemIds);
 
     /** Đọc không khóa – chỉ để biết cần khóa dòng tồn nào trước (giữ thứ tự khóa: tồn → serial → hold). */
     List<StockHold> findByRefTypeAndRefIdAndStatus(StockHold.RefType refType, Integer refId, StockHold.Status status);

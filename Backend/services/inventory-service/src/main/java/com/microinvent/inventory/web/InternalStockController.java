@@ -50,6 +50,13 @@ public class InternalStockController {
         return ApiResponse.ok(idempotency.execute("stock.receive", key, StockResult.class, () -> service.receive(req)));
     }
 
+    @Operation(summary = "Đảo tồn của 1 lần receive khi sửa / hủy phiếu nhập đã xác nhận (gửi đúng body đã receive)")
+    @PostMapping("/reverse")
+    public ApiResponse<StockResult> reverse(@RequestHeader(HeaderNames.IDEMPOTENCY_KEY) String key,
+            @Valid @RequestBody StockReceiveRequest req) {
+        return ApiResponse.ok(idempotency.execute("stock.reverse", key, StockResult.class, () -> service.reverse(req)));
+    }
+
     @Operation(summary = "Giữ hàng cho chứng từ (EXPORT_SLIP / RENTAL); thiếu hàng → 409 STOCK_NOT_ENOUGH")
     @PostMapping("/reserve")
     public ApiResponse<StockResult> reserve(@RequestHeader(HeaderNames.IDEMPOTENCY_KEY) String key,

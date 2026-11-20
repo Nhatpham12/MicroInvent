@@ -139,6 +139,95 @@ public class InternalStockService {
     }
 
     /**
+     * Đảo một lần receive khi sửa / hủy phiếu nhập đã xác nhận (SRS 3.3.1) – nhận đúng body đã gửi cho receive.
+     * Chặn (409) nếu: đảo nhiều hơn số còn lại của chứng từ, hàng đã bị giữ / xuất (không đủ khả dụng), hoặc
+     * serial đã rời kho / từng được giữ cho chứng từ khác. Kiểm hết các dòng rồi mới trừ.
+     */
+    public StockResult reverse(StockReceiveRequest req) {
+        if (!RECEIVE_REF_TYPES.contains(req.refType())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, ErrorCode.VALIDATION_ERROR.defaultMessage(),
+                    Map.of("refType", "Chỉ nhận RECEIPT, RENTAL_RETURN, SALES_RETURN"));
+        }
+        requireWritable(req.warehouseId());
+        List<StockReceiveRequest.Line> lines = req.lines().stream()
+                .sorted(Comparator.comparing(StockReceiveRequest.Line::productId)).toList();
+
+        List<String> problems = new ArrayList<>();
+        Map<Integer, StockBalance> locked = new LinkedHashMap<>();
+        Map<Integer, Integer> qtyByProduct = new TreeMap<>();
+        lines.forEach(l -> qtyByProduct.merge(l.productId(), l.qty(), Integer::sum));
+        for (Map.Entry<Integer, Integer> e : qtyByProduct.entrySet()) {
+            StockBalance b = balances.lock(e.getKey(), req.warehouseId()).orElse(null);
+            long received = movements.netQtyOfRef(req.refType(), req.refId(), e.getKey(), req.warehouseId());
+            int damagedQty = lines.stream().filter(l -> l.productId().equals(e.getKey()))
+                    .filter(l -> l.condition() == StockReceiveRequest.Condition.DAMAGED)
+                    .mapToInt(StockReceiveRequest.Line::qty).sum();
+            int goodQty = e.getValue() - damagedQty;
+            if (b == null || received < e.getValue()) {
+                problems.add("Sản phẩm " + e.getKey() + ": chứng từ chỉ còn " + Math.max(received, 0) + " để đảo");
+            } else if (b.available() < goodQty || b.getQtyDamaged() < damagedQty) {
+                problems.add("Sản phẩm " + e.getKey() + ": hàng đã bị giữ / xuất, không đủ để đảo");
+            }
+            locked.put(e.getKey(), b);
+        }
+        List<StockItem> serialItems = lockSerialsToReverse(req, lines, problems);
+        if (!problems.isEmpty()) {
+            throw new BusinessException(ErrorCode.CONFLICT, "Không đảo được tồn của chứng từ", problems);
+        }
+
+        StockMovement.Type type = req.refType() == StockMovement.RefType.RECEIPT
+                ? StockMovement.Type.IMPORT : StockMovement.Type.RETURN;
+        List<StockResult.Movement> result = new ArrayList<>();
+        for (StockReceiveRequest.Line line : lines) {
+            StockBalance b = locked.get(line.productId());
+            BigDecimal unitCost = line.unitCost() != null ? line.unitCost() : b.getAvgCost();
+            int before = b.getQtyOnHand();
+            b.setAvgCost(weightedAverageAfterRemoval(b.getAvgCost(), before, unitCost, line.qty()));
+            b.setQtyOnHand(before - line.qty());
+            if (line.condition() == StockReceiveRequest.Condition.DAMAGED) {
+                b.setQtyDamaged(b.getQtyDamaged() - line.qty());
+            }
+            result.add(StockResult.Movement.of(movements.save(movement(line.productId(), req.warehouseId(), type,
+                    req.refType(), req.refId(), -line.qty(), before, unitCost, req.userId()))));
+        }
+        items.deleteAll(serialItems);
+        return new StockResult(result, List.of(), List.of());
+    }
+
+    /** Serial cần đảo phải còn ở đúng kho, đúng trạng thái lúc nhập, (phiếu nhập) đúng phiếu và chưa từng được giữ. */
+    private List<StockItem> lockSerialsToReverse(StockReceiveRequest req, List<StockReceiveRequest.Line> lines,
+            List<String> problems) {
+        List<String> serials = lines.stream().filter(l -> l.serials() != null)
+                .flatMap(l -> l.serials().stream().map(String::trim)).toList();
+        if (serials.isEmpty()) {
+            return List.of();
+        }
+        Map<String, StockItem> found = items.lockBySerials(serials).stream()
+                .collect(Collectors.toMap(StockItem::getSerial, i -> i));
+        for (StockReceiveRequest.Line line : lines) {
+            if (line.serials() == null) {
+                continue;
+            }
+            StockItem.Status expected = line.condition() == StockReceiveRequest.Condition.DAMAGED
+                    ? StockItem.Status.DAMAGED : StockItem.Status.AVAILABLE;
+            for (String s : line.serials()) {
+                StockItem i = found.get(s.trim());
+                boolean ok = i != null && i.getProductId().equals(line.productId())
+                        && req.warehouseId().equals(i.getWarehouseId()) && i.getStatus() == expected
+                        && (req.refType() != StockMovement.RefType.RECEIPT || req.refId().equals(i.getReceiptId()));
+                if (!ok) {
+                    problems.add("Serial " + s.trim() + " không còn nguyên trong kho theo chứng từ này");
+                }
+            }
+        }
+        List<StockItem> list = new ArrayList<>(found.values());
+        if (holds.existsByStockItemIdIn(list.stream().map(StockItem::getId).toList())) {
+            problems.add("Có serial đã từng được giữ cho chứng từ khác, không đảo được");
+        }
+        return list;
+    }
+
+    /**
      * Giữ hàng cho chứng từ: kiểm đủ tất cả các dòng rồi mới giữ (thiếu 1 dòng → không giữ dòng nào).
      * Thứ tự khóa dùng chung cho reserve / commit / release: dòng tồn (theo productId) → serial → hold.
      * <p>
@@ -395,6 +484,17 @@ public class InternalStockService {
     private StockBalance lockOrCreate(Integer productId, Integer warehouseId) {
         balances.insertIfAbsent(productId, warehouseId);
         return balances.lock(productId, warehouseId).orElseThrow();
+    }
+
+    /** Giá vốn bình quân sau khi bỏ ra {@code qty} đã nhập với giá {@code unitCost} (đảo phiếu nhập). */
+    static BigDecimal weightedAverageAfterRemoval(BigDecimal avg, int onHand, BigDecimal unitCost, int qty) {
+        int remaining = onHand - qty;
+        if (remaining <= 0) {
+            return avg;
+        }
+        BigDecimal value = avg.multiply(BigDecimal.valueOf(onHand)).subtract(unitCost.multiply(BigDecimal.valueOf(qty)));
+        return value.signum() < 0 ? BigDecimal.ZERO
+                : value.divide(BigDecimal.valueOf(remaining), 2, RoundingMode.HALF_UP);
     }
 
     /** Giá vốn bình quân gia quyền sau khi nhập thêm {@code qty} với giá {@code unitCost}. */
