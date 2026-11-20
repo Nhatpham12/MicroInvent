@@ -1,0 +1,302 @@
+.app-shell {
+  min-height: 100vh;
+  padding-top: 64px;
+  background: #f5f5f5;
+}
+
+.app-header {
+  position: fixed;
+  z-index: 20;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  height: 64px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f0f0f0;
+  padding: 0 24px;
+  background: #ffffff;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #262626;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.header-brand-mark {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 8px;
+  color: #ffffff;
+  background: #0a7c86;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.header-right,
+.profile-button {
+  display: flex;
+  align-items: center;
+}
+
+.header-right {
+  gap: 16px;
+}
+
+.mock-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #ffe58f;
+  border-radius: 20px;
+  padding: 4px 10px;
+  color: #ad6800;
+  background: #fffbe6;
+  font-size: 12px;
+}
+
+.mock-indicator > span,
+.sidebar-footer-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #faad14;
+}
+
+.header-icon-button,
+.profile-button {
+  position: relative;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.header-icon-button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  color: #595959;
+  font-size: 21px;
+}
+
+.notification-dot {
+  position: absolute;
+  top: 5px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid #ffffff;
+  border-radius: 50%;
+  background: #ff4d4f;
+}
+
+.header-divider {
+  width: 1px;
+  height: 26px;
+  background: #f0f0f0;
+}
+
+.profile-button {
+  gap: 8px;
+  color: #262626;
+  font-size: 13px;
+}
+
+.profile-avatar {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  color: #08636b;
+  background: #cee5e7;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.profile-chevron {
+  color: #8c8c8c;
+}
+
+.app-sidebar {
+  position: fixed;
+  z-index: 10;
+  top: 64px;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  width: 240px;
+  flex-direction: column;
+  border-right: 1px solid #f0f0f0;
+  background: #ffffff;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  overflow: auto;
+  padding: 16px 12px;
+}
+
+.sidebar-link {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 12px;
+  border-radius: 6px;
+  padding: 0 12px;
+  color: #595959;
+  font-size: 14px;
+  text-decoration: none;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.sidebar-link:hover {
+  color: #0a7c86;
+  background: #f5f5f5;
+}
+
+.sidebar-link.is-active {
+  color: #0a7c86;
+  background: #ebf5f5;
+  font-weight: 500;
+}
+
+.sidebar-link.is-disabled {
+  color: #bfbfbf;
+  cursor: not-allowed;
+}
+
+.sidebar-icon {
+  display: inline-grid;
+  width: 18px;
+  flex: 0 0 18px;
+  place-items: center;
+  color: currentColor;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.sidebar-footer {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid #f0f0f0;
+  padding: 0 20px;
+  color: #595959;
+  font-size: 12px;
+}
+
+.sidebar-footer-dot {
+  background: #0a7c86;
+}
+
+.app-main {
+  min-height: calc(100vh - 64px);
+  margin-left: 240px;
+}
+
+@media (max-width: 900px) {
+  .app-sidebar {
+    width: 72px;
+  }
+
+  .sidebar-nav {
+    align-items: center;
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .sidebar-link {
+    width: 48px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .sidebar-label,
+  .sidebar-footer > span:last-child {
+    display: none;
+  }
+
+  .sidebar-footer {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .app-main {
+    margin-left: 72px;
+  }
+}
+
+@media (max-width: 600px) {
+  .app-shell {
+    padding-top: 56px;
+  }
+
+  .app-header {
+    height: 56px;
+    padding: 0 14px;
+  }
+
+  .header-brand {
+    font-size: 14px;
+  }
+
+  .mock-indicator {
+    padding: 3px 7px;
+    font-size: 10px;
+  }
+
+  .header-right {
+    gap: 9px;
+  }
+
+  .header-divider,
+  .profile-name,
+  .profile-chevron {
+    display: none;
+  }
+
+  .app-sidebar {
+    position: static;
+    width: 100%;
+    height: 52px;
+    border-right: 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 5px 10px;
+  }
+
+  .sidebar-link {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+  }
+
+  .sidebar-footer {
+    display: none;
+  }
+
+  .app-main {
+    min-height: calc(100vh - 108px);
+    margin-left: 0;
+  }
+}
