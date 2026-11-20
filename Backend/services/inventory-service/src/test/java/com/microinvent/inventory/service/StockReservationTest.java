@@ -127,6 +127,18 @@ class StockReservationTest {
     }
 
     @Test
+    void reserveChecksExistingHoldsOnlyAfterLockingStockRows() {
+        // Kiểm trước khi khóa thì 2 request song song cùng chứng từ đều thấy "chưa giữ" → giữ 2 lần.
+        stock.put(5, balance(5, 10, 0));
+        service.reserve(reserve(line(5, 1, null)));
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(balances, holds);
+        order.verify(balances).lock(5, 1);
+        order.verify(holds).findByRefTypeAndRefIdAndStatus(StockHold.RefType.EXPORT_SLIP, 50, StockHold.Status.ACTIVE);
+        order.verify(holds).save(any());
+    }
+
+    @Test
     void commitExportDeductsStockMarksSerialsSoldAndUsesSerialCost() {
         stock.put(1, balance(1, 3, 0));
         StockItem a = item(11L, 1, "SN-A", StockItem.Status.AVAILABLE, "100");
