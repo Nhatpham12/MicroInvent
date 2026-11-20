@@ -36,6 +36,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.springframework.dao.DataIntegrityViolationException;
 
 class InternalStockServiceTest {
 
@@ -86,7 +87,7 @@ class InternalStockServiceTest {
                 line(1, 2, List.of("SN-A", "SN-B"), "38000000", Condition.DAMAGED)));
 
         ArgumentCaptor<StockItem> saved = ArgumentCaptor.forClass(StockItem.class);
-        verify(items, times(2)).save(saved.capture());
+        verify(items, times(2)).saveAndFlush(saved.capture());
         assertThat(saved.getAllValues()).extracting(StockItem::getSerial).containsExactly("SN-A", "SN-B");
         assertThat(saved.getAllValues()).extracting(StockItem::getStatus).containsOnly(StockItem.Status.DAMAGED);
         assertThat(saved.getAllValues()).extracting(StockItem::getReceiptId).containsOnly((Integer) null);
@@ -117,6 +118,29 @@ class InternalStockServiceTest {
                     assertThat(((BusinessException) ex).getDetails()).isEqualTo(Map.of("serials", List.of("SN-A")));
                 });
         verify(balances, never()).lock(any(), any());
+    }
+
+    @Test
+    void receiveReturnsConflictWhenConcurrentReceiptInsertedSameSerial() {
+        // Phiếu song song đã ghi serial sau bước kiểm tra → INSERT vướng UNIQUE(serial).
+        when(items.saveAndFlush(any(StockItem.class)))
+                .thenThrow(new DataIntegrityViolationException("Duplicate entry 'SN-A' for key 'stock_items.serial'"));
+
+        assertThatThrownBy(() -> service.receive(receive(StockMovement.RefType.RECEIPT,
+                line(1, 1, List.of("SN-A"), "1", null))))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> {
+                    assertThat(((BusinessException) ex).getCode()).isEqualTo(ErrorCode.CONFLICT);
+                    assertThat(((BusinessException) ex).getDetails()).isEqualTo(Map.of("serials", List.of("SN-A")));
+                });
+    }
+
+    @Test
+    void checkRejectsUnknownWarehouse() {
+        when(warehouses.findAll()).thenReturn(List.of(warehouse(1, Warehouse.Status.ACTIVE, false)));
+
+        assertThatThrownBy(() -> service.check(new StockCheckRequest(99, List.of(new StockCheckRequest.Item(5, 1)))))
+                .extracting("code").isEqualTo(ErrorCode.NOT_FOUND);
     }
 
     @Test

@@ -25,8 +25,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -35,6 +38,11 @@ import org.springframework.util.StringUtils;
 @Service
 @Transactional
 public class WarehouseService {
+
+    private static final Logger log = LoggerFactory.getLogger(WarehouseService.class);
+
+    /** Trường được phép dùng trong ?sort= của danh sách kho (totalQty, stockValue là số tính thêm, không sắp xếp được). */
+    static final Set<String> SORTABLE_FIELDS = Set.of("code", "name", "type", "status", "createdAt");
 
     private final WarehouseRepository repository;
     private final ProductWarehouseSettingRepository settings;
@@ -48,6 +56,7 @@ public class WarehouseService {
     @Transactional(readOnly = true)
     public PageResponse<WarehouseResponse> list(Warehouse.Type type, Warehouse.Status status, String keyword,
             Pageable pageable) {
+        checkSort(pageable.getSort());
         UserContext user = UserContextHolder.get();
         Set<Integer> ids = user.warehouseIds().stream().map(Long::intValue).collect(Collectors.toSet());
         if (ids.isEmpty()) {
@@ -77,6 +86,8 @@ public class WarehouseService {
         Warehouse w = new Warehouse();
         w.setCode(code);
         apply(w, req);
+        // Chưa có kho mặc định (thường là kho đầu tiên) thì kho mới tự nhận, để hệ thống luôn có kho mặc định.
+        w.setDefaultWarehouse(!repository.existsByDefaultWarehouseTrue());
         return toResponse(repository.save(w), null);
     }
 
@@ -92,8 +103,9 @@ public class WarehouseService {
         get(id);
         List<Blocker> blockers = new ArrayList<>();
         add(blockers, BlockerType.STOCK_REMAINING, repository.sumOnHand(id), "Kho còn %d đơn vị tồn");
-        long inTransit = repository.sumInTransitIn(id) + repository.countTransfersInTransit(id);
-        add(blockers, BlockerType.IN_TRANSIT, inTransit, "Còn %d hàng / phiếu đang vận chuyển đi hoặc đến kho");
+        // Đếm theo phiếu: hàng đang đến kho (qty_in_transit_in) luôn thuộc một phiếu IN_TRANSIT đã được đếm ở đây.
+        add(blockers, BlockerType.IN_TRANSIT, repository.countTransfersInTransit(id),
+                "Còn %d phiếu chuyển kho đang vận chuyển đi hoặc đến kho");
         add(blockers, BlockerType.OPEN_DOCUMENTS, repository.countOpenDocuments(id),
                 "Còn %d phiếu chuyển kho / kiểm kê chưa hoàn tất");
         add(blockers, BlockerType.ACTIVE_HOLDS, repository.countActiveHolds(id), "Còn %d lượt giữ hàng");
@@ -103,7 +115,7 @@ public class WarehouseService {
     }
 
     /** Chỉ được CLOSED khi close-check không còn điều kiện chặn (SRS 8.5#8); kho mặc định không được ngừng. */
-    public WarehouseResponse changeStatus(Integer id, Warehouse.Status status) {
+    public WarehouseResponse changeStatus(Integer id, Warehouse.Status status, String reason) {
         Warehouse w = get(id);
         if (status != Warehouse.Status.ACTIVE && w.isDefaultWarehouse()) {
             throw new BusinessException(ErrorCode.CONFLICT, "Không thể ngừng kho mặc định, hãy đặt kho khác làm mặc định trước");
@@ -115,17 +127,22 @@ public class WarehouseService {
                         "Kho chưa đủ điều kiện ngừng hoạt động", check.blockers());
             }
         }
+        UserContext user = UserContextHolder.get();
+        // TODO(audit): gửi audit.log sang report-service khi có audit_logs; tạm thời chỉ ghi log.
+        log.info("Đổi trạng thái kho {} (id={}): {} -> {} bởi {} (id={}), lý do: {}", w.getCode(), id,
+                w.getStatus(), status, user.username(), user.userId(), StringUtils.hasText(reason) ? reason : "-");
         w.setStatus(status);
         return toResponse(w);
     }
 
     public WarehouseResponse setDefault(Integer id) {
-        Warehouse w = get(id);
+        List<Warehouse> all = repository.findAllForUpdate();
+        Warehouse w = all.stream().filter(x -> x.getId().equals(id)).findFirst()
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Không tìm thấy kho"));
         if (w.getStatus() != Warehouse.Status.ACTIVE) {
             throw new BusinessException(ErrorCode.CONFLICT, "Chỉ kho đang hoạt động mới được đặt làm mặc định");
         }
-        repository.clearDefaultExcept(id);
-        w.setDefaultWarehouse(true);
+        all.forEach(x -> x.setDefaultWarehouse(x == w));
         return toResponse(w);
     }
 
@@ -161,6 +178,17 @@ public class WarehouseService {
     private static void checkAccess(Integer warehouseId) {
         if (!UserContextHolder.get().canAccessWarehouse(warehouseId.longValue())) {
             throw new BusinessException(ErrorCode.WAREHOUSE_FORBIDDEN);
+        }
+    }
+
+    /** Trường sort lạ làm Hibernate lỗi khi dựng query (500) – chặn trước, trả 400. */
+    private static void checkSort(Sort sort) {
+        for (Sort.Order order : sort) {
+            if (!SORTABLE_FIELDS.contains(order.getProperty())) {
+                String allowed = String.join(", ", SORTABLE_FIELDS.stream().sorted().toList());
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, ErrorCode.VALIDATION_ERROR.defaultMessage(),
+                        Map.of("sort", "Chỉ sắp xếp được theo: " + allowed));
+            }
         }
     }
 

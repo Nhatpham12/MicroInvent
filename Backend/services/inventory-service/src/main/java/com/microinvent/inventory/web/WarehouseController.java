@@ -83,7 +83,7 @@ public class WarehouseController {
     @RequireRoles("ADMIN")
     public ApiResponse<WarehouseResponse> changeStatus(@PathVariable Integer id,
             @Valid @RequestBody WarehouseStatusRequest req) {
-        return ApiResponse.ok(service.changeStatus(id, req.status()));
+        return ApiResponse.ok(service.changeStatus(id, req.status(), req.reason()));
     }
 
     @Operation(summary = "Đặt kho mặc định hệ thống")

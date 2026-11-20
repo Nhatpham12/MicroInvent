@@ -32,7 +32,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -70,6 +72,9 @@ public class InternalStockService {
     public StockCheckResponse check(StockCheckRequest req) {
         Map<Integer, String> names = warehouses.findAll().stream()
                 .collect(Collectors.toMap(Warehouse::getId, Warehouse::getName));
+        if (!names.containsKey(req.warehouseId())) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "Không tìm thấy kho");
+        }
         List<StockCheckResponse.Line> lines = new ArrayList<>();
         for (StockCheckRequest.Item item : req.items()) {
             int available = balances.findByProductIdAndWarehouseId(item.productId(), req.warehouseId())
@@ -124,7 +129,7 @@ public class InternalStockService {
                     item.setSupplierId(line.supplierId());
                     item.setReceiptId(req.refType() == StockMovement.RefType.RECEIPT ? req.refId() : null);
                     item.setReceivedAt(now);
-                    items.save(item);
+                    saveSerial(item);
                 }
             }
             result.add(StockResult.Movement.of(movements.save(movement(line.productId(), req.warehouseId(), type,
@@ -225,16 +230,17 @@ public class InternalStockService {
     /**
      * Giữ hàng cho chứng từ: kiểm đủ tất cả các dòng rồi mới giữ (thiếu 1 dòng → không giữ dòng nào).
      * Thứ tự khóa dùng chung cho reserve / commit / release: dòng tồn (theo productId) → serial → hold.
+     * <p>
+     * READ COMMITTED: bước kiểm "chứng từ đã giữ hàng" chạy sau khi chờ khóa dòng tồn, phải đọc được hold mà
+     * request song song vừa commit (REPEATABLE READ sẽ đọc snapshot cũ từ đầu transaction).
      */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public StockResult reserve(StockReserveRequest req) {
         if (!COMMIT_TYPES.containsKey(req.refType())) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, ErrorCode.VALIDATION_ERROR.defaultMessage(),
                     Map.of("refType", "Chỉ nhận EXPORT_SLIP, RENTAL"));
         }
         requireWritable(req.warehouseId());
-        if (!holds.findByRefTypeAndRefIdAndStatus(req.refType(), req.refId(), StockHold.Status.ACTIVE).isEmpty()) {
-            throw new BusinessException(ErrorCode.CONFLICT, "Chứng từ đã giữ hàng, hãy release trước khi giữ lại");
-        }
         Map<Integer, Integer> qtyByProduct = new TreeMap<>();
         Map<Integer, List<String>> serialsByProduct = new TreeMap<>();
         for (StockReserveRequest.Line line : req.lines()) {
@@ -258,6 +264,11 @@ public class InternalStockService {
                 shortages.add(Map.of("productId", e.getKey(), "requested", e.getValue(), "available", available));
             }
             locked.put(e.getKey(), b);
+        }
+        // Kiểm sau khi đã khóa dòng tồn: 2 request giữ hàng cùng chứng từ chạy song song thì request sau phải chờ
+        // khóa, rồi (READ COMMITTED) thấy hold request trước vừa ghi → 409, không giữ 2 lần.
+        if (!holds.findByRefTypeAndRefIdAndStatus(req.refType(), req.refId(), StockHold.Status.ACTIVE).isEmpty()) {
+            throw new BusinessException(ErrorCode.CONFLICT, "Chứng từ đã giữ hàng, hãy release trước khi giữ lại");
         }
         if (!shortages.isEmpty()) {
             throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH, ErrorCode.STOCK_NOT_ENOUGH.defaultMessage(),
@@ -454,6 +465,19 @@ public class InternalStockService {
                 throw new BusinessException(ErrorCode.CONFLICT, "Serial đã tồn tại trong hệ thống",
                         Map.of("serials", existing));
             }
+        }
+    }
+
+    /**
+     * 2 phiếu nhập cùng serial chạy song song đều qua được {@link #checkSerials}; phiếu sau vướng UNIQUE(serial)
+     * khi INSERT (id IDENTITY nên save() ghi ngay) → trả 409 thay vì lỗi 500.
+     */
+    private void saveSerial(StockItem item) {
+        try {
+            items.saveAndFlush(item);
+        } catch (DataIntegrityViolationException ex) {
+            throw new BusinessException(ErrorCode.CONFLICT, "Serial đã tồn tại trong hệ thống",
+                    Map.of("serials", List.of(item.getSerial())));
         }
     }
 

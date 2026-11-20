@@ -3,6 +3,7 @@ package com.microinvent.inventory.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -33,6 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 class WarehouseServiceTest {
 
@@ -84,9 +86,11 @@ class WarehouseServiceTest {
     @Test
     void createUppercasesCodeAndRejectsDuplicate() {
         when(repository.existsByCodeIgnoreCase("HN02")).thenReturn(false);
+        when(repository.existsByDefaultWarehouseTrue()).thenReturn(true);
         WarehouseResponse created = service.create(request(" hn02 "));
         assertThat(created.code()).isEqualTo("HN02");
         assertThat(created.status()).isEqualTo(Warehouse.Status.ACTIVE);
+        assertThat(created.isDefault()).isFalse();
 
         when(repository.existsByCodeIgnoreCase("HN01")).thenReturn(true);
         assertThatThrownBy(() -> service.create(request("HN01")))
@@ -95,11 +99,34 @@ class WarehouseServiceTest {
     }
 
     @Test
+    void firstWarehouseBecomesDefault() {
+        when(repository.existsByDefaultWarehouseTrue()).thenReturn(false);
+
+        assertThat(service.create(request("HN01")).isDefault()).isTrue();
+    }
+
+    @Test
+    void listRejectsUnknownSortField() {
+        assertThatThrownBy(() -> service.list(null, null, null, PageRequest.of(0, 20, Sort.by("totalQty"))))
+                .isInstanceOf(BusinessException.class)
+                .extracting("code").isEqualTo(ErrorCode.VALIDATION_ERROR);
+        verify(repository, never()).search(any(), any(), any(), anyBoolean(), any(), any());
+    }
+
+    @Test
+    void listAcceptsWhitelistedSortField() {
+        when(repository.search(any(), any(), any(), anyBoolean(), any(), any())).thenReturn(Page.empty());
+
+        assertThat(service.list(null, null, null, PageRequest.of(0, 20, Sort.by("name", "createdAt"))).content())
+                .isEmpty();
+    }
+
+    @Test
     void closeIsBlockedWhileStockRemains() {
         when(repository.findById(3)).thenReturn(Optional.of(warehouse(3, Warehouse.Status.ACTIVE, false)));
         when(repository.sumOnHand(3)).thenReturn(5L);
 
-        assertThatThrownBy(() -> service.changeStatus(3, Warehouse.Status.CLOSED))
+        assertThatThrownBy(() -> service.changeStatus(3, Warehouse.Status.CLOSED, "Dọn kho"))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(ex -> {
                     BusinessException be = (BusinessException) ex;
@@ -113,8 +140,7 @@ class WarehouseServiceTest {
     void closeCheckListsEveryBlocker() {
         when(repository.findById(3)).thenReturn(Optional.of(warehouse(3, Warehouse.Status.ACTIVE, false)));
         when(repository.sumOnHand(3)).thenReturn(5L);
-        when(repository.sumInTransitIn(3)).thenReturn(2L);
-        when(repository.countTransfersInTransit(3)).thenReturn(1L);
+        when(repository.countTransfersInTransit(3)).thenReturn(2L);
         when(repository.countOpenDocuments(3)).thenReturn(1L);
         when(repository.countActiveHolds(3)).thenReturn(4L);
         when(repository.sumRentedLoaned(3)).thenReturn(1L);
@@ -125,7 +151,8 @@ class WarehouseServiceTest {
         assertThat(check.blockers()).extracting("type").containsExactly(BlockerType.STOCK_REMAINING,
                 BlockerType.IN_TRANSIT, BlockerType.OPEN_DOCUMENTS, BlockerType.ACTIVE_HOLDS,
                 BlockerType.ACTIVE_RENTALS);
-        assertThat(check.blockers().get(1).count()).isEqualTo(3);
+        // IN_TRANSIT đếm theo số phiếu, không cộng thêm số đơn vị hàng đang đến
+        assertThat(check.blockers().get(1).count()).isEqualTo(2);
     }
 
     @Test
@@ -133,7 +160,7 @@ class WarehouseServiceTest {
         Warehouse w = warehouse(3, Warehouse.Status.ACTIVE, false);
         when(repository.findById(3)).thenReturn(Optional.of(w));
 
-        WarehouseResponse res = service.changeStatus(3, Warehouse.Status.CLOSED);
+        WarehouseResponse res = service.changeStatus(3, Warehouse.Status.CLOSED, null);
 
         assertThat(res.status()).isEqualTo(Warehouse.Status.CLOSED);
         assertThat(w.getStatus()).isEqualTo(Warehouse.Status.CLOSED);
@@ -143,24 +170,28 @@ class WarehouseServiceTest {
     void defaultWarehouseCannotBeSuspended() {
         when(repository.findById(1)).thenReturn(Optional.of(warehouse(1, Warehouse.Status.ACTIVE, true)));
 
-        assertThatThrownBy(() -> service.changeStatus(1, Warehouse.Status.SUSPENDED))
+        assertThatThrownBy(() -> service.changeStatus(1, Warehouse.Status.SUSPENDED, null))
                 .isInstanceOf(BusinessException.class)
                 .extracting("code").isEqualTo(ErrorCode.CONFLICT);
     }
 
     @Test
-    void setDefaultClearsOtherDefaultsAndRequiresActive() {
-        Warehouse active = warehouse(2, Warehouse.Status.ACTIVE, false);
-        when(repository.findById(2)).thenReturn(Optional.of(active));
+    void setDefaultLocksAllWarehousesAndKeepsExactlyOneDefault() {
+        Warehouse w1 = warehouse(1, Warehouse.Status.ACTIVE, true);
+        Warehouse w2 = warehouse(2, Warehouse.Status.ACTIVE, false);
+        Warehouse w3 = warehouse(3, Warehouse.Status.SUSPENDED, false);
+        when(repository.findAllForUpdate()).thenReturn(List.of(w1, w2, w3));
 
         assertThat(service.setDefault(2).isDefault()).isTrue();
-        verify(repository).clearDefaultExcept(2);
+        assertThat(List.of(w1, w2, w3)).extracting(Warehouse::isDefaultWarehouse).containsExactly(false, true, false);
 
-        when(repository.findById(3)).thenReturn(Optional.of(warehouse(3, Warehouse.Status.SUSPENDED, false)));
         assertThatThrownBy(() -> service.setDefault(3))
                 .isInstanceOf(BusinessException.class)
                 .extracting("code").isEqualTo(ErrorCode.CONFLICT);
-        verify(repository, never()).clearDefaultExcept(3);
+        assertThat(w2.isDefaultWarehouse()).isTrue();
+        assertThatThrownBy(() -> service.setDefault(9))
+                .isInstanceOf(BusinessException.class)
+                .extracting("code").isEqualTo(ErrorCode.NOT_FOUND);
     }
 
     @Test

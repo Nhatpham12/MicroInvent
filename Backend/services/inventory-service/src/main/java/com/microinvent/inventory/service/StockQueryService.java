@@ -21,6 +21,7 @@ import com.microinvent.inventory.web.dto.StockResult;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -98,8 +99,7 @@ public class StockQueryService {
             String keyword, Pageable pageable) {
         checkSort(pageable.getSort(), ITEM_SORT);
         Scope s = scope(warehouseId);
-        String kw = StringUtils.hasText(keyword) ? keyword.trim() : null;
-        return PageResponse.of(items.search(s.all(), s.ids(), productId, status, kw, pageable)
+        return PageResponse.of(items.search(s.all(), s.ids(), productId, status, likePattern(keyword), pageable)
                 .map(i -> StockItemView.of(i, null)));
     }
 
@@ -139,6 +139,16 @@ public class StockQueryService {
     }
 
     private record Scope(boolean all, Set<Integer> ids) {
+    }
+
+    /** "%abc%" chữ thường cho LIKE … ESCAPE '!'; thoát %, _ để tìm đúng chuỗi đã gõ (gõ "%" không ra mọi serial). */
+    static String likePattern(String keyword) {
+        if (!StringUtils.hasText(keyword)) {
+            return null;
+        }
+        String escaped = keyword.trim().toLowerCase(Locale.ROOT)
+                .replace("!", "!!").replace("%", "!%").replace("_", "!_");
+        return "%" + escaped + "%";
     }
 
     private Map<Integer, String> warehouseNames() {

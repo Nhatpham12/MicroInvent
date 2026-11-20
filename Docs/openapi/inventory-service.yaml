@@ -69,7 +69,9 @@ paths:
     get:
       tags: [Warehouses]
       summary: Danh sách kho (kèm tổng tồn, giá trị tồn)
-      description: Vai trò không có `all_warehouses` chỉ thấy kho được gán.
+      description: |
+        Vai trò không có `all_warehouses` chỉ thấy kho được gán.
+        `sort` chỉ nhận `code`, `name`, `type`, `status`, `createdAt` (mặc định `code,asc`); trường khác → 400 `VALIDATION_ERROR`.
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
@@ -94,6 +96,7 @@ paths:
     post:
       tags: [Warehouses]
       summary: Tạo kho (ADMIN)
+      description: Chưa có kho mặc định nào (vd kho đầu tiên) thì kho mới tự được đặt làm mặc định.
       requestBody:
         required: true
         content:
@@ -202,7 +205,9 @@ paths:
     put:
       tags: [MinStock]
       summary: Đặt ngưỡng tồn (bulk, ADMIN/MANAGER)
-      description: Gửi `minStock = null` để xóa ngưỡng riêng (dùng ngưỡng chung của sản phẩm).
+      description: |
+        Gửi `minStock = null` để xóa ngưỡng riêng (dùng ngưỡng chung của sản phẩm).
+        **Luôn gửi trường `minStock`**: thiếu trường này server cũng hiểu là `null` → xóa ngưỡng của sản phẩm đó.
       requestBody:
         required: true
         content:
