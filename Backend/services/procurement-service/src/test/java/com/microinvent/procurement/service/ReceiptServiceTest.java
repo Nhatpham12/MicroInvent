@@ -174,6 +174,13 @@ class ReceiptServiceTest {
     }
 
     @Test
+    void keywordEscapesLikeWildcards() {
+        assertThat(ReceiptService.likePattern(" PNK_2026% ")).isEqualTo("%pnk!_2026!%%");
+        assertThat(ReceiptService.likePattern("a!b")).isEqualTo("%a!!b%");
+        assertThat(ReceiptService.likePattern(" ")).isNull();
+    }
+
+    @Test
     void updateConfirmedReversesOldThenReceivesNewAndRestoresOnFailure() {
         GoodsReceipt confirmed = draft();
         confirmed.setStatus(GoodsReceipt.Status.CONFIRMED);

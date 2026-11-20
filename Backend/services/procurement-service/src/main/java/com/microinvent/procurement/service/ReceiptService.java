@@ -23,6 +23,7 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -81,9 +82,9 @@ public class ReceiptService {
                 ids = Set.of(-1); // tránh "IN ()" rỗng
             }
         }
-        String kw = StringUtils.hasText(keyword) ? keyword.trim() : null;
         return PageResponse.of(receipts.search(all, ids, supplierId, status,
-                from == null ? null : from.atStartOfDay(), to == null ? null : to.plusDays(1).atStartOfDay(), kw,
+                from == null ? null : from.atStartOfDay(), to == null ? null : to.plusDays(1).atStartOfDay(),
+                likePattern(keyword),
                 pageable).map(r -> ReceiptResponse.of(r, false)));
     }
 
@@ -311,6 +312,16 @@ public class ReceiptService {
     private static BusinessException invalid(String field, String message) {
         return new BusinessException(ErrorCode.VALIDATION_ERROR, ErrorCode.VALIDATION_ERROR.defaultMessage(),
                 Map.of(field, message));
+    }
+
+    /** "%abc%" chữ thường cho LIKE … ESCAPE '!'; thoát %, _ để tìm đúng chuỗi đã gõ (gõ "%" không ra mọi phiếu). */
+    static String likePattern(String keyword) {
+        if (!StringUtils.hasText(keyword)) {
+            return null;
+        }
+        String escaped = keyword.trim().toLowerCase(Locale.ROOT)
+                .replace("!", "!!").replace("%", "!%").replace("_", "!_");
+        return "%" + escaped + "%";
     }
 
     private static String trimToNull(String s) {

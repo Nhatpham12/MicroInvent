@@ -26,8 +26,8 @@ public interface GoodsReceiptRepository extends JpaRepository<GoodsReceipt, Inte
               AND (:status IS NULL OR r.status = :status)
               AND (:from IS NULL OR r.receiptDate >= :from)
               AND (:to IS NULL OR r.receiptDate < :to)
-              AND (:keyword IS NULL OR LOWER(r.code) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                   OR LOWER(r.contractNo) LIKE LOWER(CONCAT('%', :keyword, '%')))
+              AND (:keyword IS NULL OR LOWER(r.code) LIKE :keyword ESCAPE '!'
+                   OR LOWER(r.contractNo) LIKE :keyword ESCAPE '!')
             """)
     Page<GoodsReceipt> search(boolean allWarehouses, Collection<Integer> ids, Integer supplierId,
             GoodsReceipt.Status status, LocalDateTime from, LocalDateTime to, String keyword, Pageable pageable);
