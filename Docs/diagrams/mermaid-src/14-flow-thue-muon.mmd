@@ -1,0 +1,12 @@
+flowchart TD
+  A["Tạo phiếu thuê hoặc mượn"] --> B["Chọn loại, khách hàng, kho xuất"]
+  B --> C["Chọn sản phẩm, serial, ngày bắt đầu, hạn trả, tiền cọc"]
+  C --> D["Xác nhận xuất: tồn khả dụng giảm"]
+  D --> E["Đang thuê hoặc mượn"]
+  E -->|Còn 7 ngày hoặc ít hơn| G["Cảnh báo sắp hết hạn"]
+  E --> H["Khách trả hàng, có thể trả một phần, tại kho bất kỳ"]
+  H --> I{"Trả đủ chưa?"}
+  I -->|Chưa| E
+  I -->|Đủ| J{"Quá hạn từ 10 ngày?"}
+  J -->|Có| K["Tính phạt, trừ vào tiền cọc"] --> M["Đóng phiếu"]
+  J -->|Không| L["Hoàn cọc"] --> M

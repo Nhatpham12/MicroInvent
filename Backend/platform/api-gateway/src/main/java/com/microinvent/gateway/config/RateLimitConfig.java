@@ -7,6 +7,7 @@ import org.springframework.cloud.gateway.filter.ratelimit.KeyResolver;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 @Configuration
@@ -21,9 +22,18 @@ public class RateLimitConfig {
             if (userId != null) {
                 return Mono.just("user:" + userId);
             }
-            String ip = Optional.ofNullable(exchange.getRequest().getRemoteAddress())
-                    .map(InetSocketAddress::getAddress).map(a -> a.getHostAddress()).orElse("unknown");
-            return Mono.just("ip:" + ip);
+            return Mono.just("ip:" + clientIp(exchange));
         };
+    }
+
+    /** Luôn theo IP – cho các API quên mật khẩu / OTP (route identity-password-recovery). */
+    @Bean
+    public KeyResolver ipKeyResolver() {
+        return exchange -> Mono.just("ip:" + clientIp(exchange));
+    }
+
+    private static String clientIp(ServerWebExchange exchange) {
+        return Optional.ofNullable(exchange.getRequest().getRemoteAddress())
+                .map(InetSocketAddress::getAddress).map(a -> a.getHostAddress()).orElse("unknown");
     }
 }

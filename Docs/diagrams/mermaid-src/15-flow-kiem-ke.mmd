@@ -1,0 +1,11 @@
+flowchart TD
+  A["Thủ kho lập phiếu kiểm kê cho một kho"] --> B["Hệ thống chụp tồn hiện tại"]
+  B --> C{"Khóa giao dịch kho?"}
+  C -->|Có| D["Kho tạm khóa nhập xuất"] --> E["Đếm hàng"]
+  C -->|Không| E
+  E --> F["Nhập số đếm hoặc quét serial"]
+  F --> G["Xem chênh lệch"]
+  G --> H["Gửi duyệt"]
+  H --> I{"Quản lý quyết định"}
+  I -->|Duyệt| J["Tạo phiếu điều chỉnh tồn, mở khóa kho"]
+  I -->|Hủy| X["Hủy phiếu, mở khóa kho"]

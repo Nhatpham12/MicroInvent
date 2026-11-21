@@ -36,6 +36,20 @@ spring:
               uri: lb://tenant-service
               predicates:
                 - Path=/api/v1/tenants/**
+            # Quên mật khẩu / OTP: giới hạn chặt hơn theo IP để chống dò OTP và spam email
+            # (thêm vào giới hạn chung ở default-filters). Route này phải đứng trước route identity.
+            - id: identity-password-recovery
+              uri: lb://identity-service
+              predicates:
+                - Path=/api/v1/auth/forgot-password,/api/v1/auth/verify-otp,/api/v1/auth/reset-password
+              filters:
+                # Mỗi request tốn 60 token, nạp 10 token/giây → 10 request/phút/IP, dồn tối đa 10 request (600 token).
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 10
+                    redis-rate-limiter.burstCapacity: 600
+                    redis-rate-limiter.requestedTokens: 60
+                    key-resolver: "#{@ipKeyResolver}"
             - id: identity
               uri: lb://identity-service
               predicates:

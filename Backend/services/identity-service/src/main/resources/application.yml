@@ -20,8 +20,10 @@ spring:
     # Dev: Mailpit (docker compose up -d mailpit), xem thư tại http://localhost:8025
     host: ${MAIL_HOST:localhost}
     port: ${MAIL_PORT:1025}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
+    # Không đặt mặc định cho secret: môi trường thật phải khai báo MAIL_USERNAME / MAIL_PASSWORD
+    # (Mailpit không cần đăng nhập – profile dev để trống sẵn, xem application-dev.yml).
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
 
 eureka:
   client:

@@ -36,3 +36,6 @@ build/
 ### Logs / uploads ###
 logs/
 uploads/
+
+### Ảnh sản phẩm khi chạy local (catalog-service, microinvent.catalog.image-dir) ###
+data/product-images/

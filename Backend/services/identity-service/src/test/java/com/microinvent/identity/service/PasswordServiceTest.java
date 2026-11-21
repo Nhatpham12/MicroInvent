@@ -3,13 +3,11 @@ package com.microinvent.identity.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -30,7 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.mail.MailSendException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -44,7 +42,7 @@ class PasswordServiceTest {
     private UserRepository users;
     private PasswordOtpRepository otps;
     private RefreshTokenRepository refreshTokens;
-    private OtpMailSender mail;
+    private ApplicationEventPublisher events;
     private PasswordService service;
     private User user;
     /** OTP rõ mà service gửi qua mail (bắt từ mock). */
@@ -55,8 +53,8 @@ class PasswordServiceTest {
         users = mock(UserRepository.class);
         otps = mock(PasswordOtpRepository.class);
         refreshTokens = mock(RefreshTokenRepository.class);
-        mail = mock(OtpMailSender.class);
-        service = new PasswordService(users, otps, refreshTokens, ENCODER, mail, CLOCK);
+        events = mock(ApplicationEventPublisher.class);
+        service = new PasswordService(users, otps, refreshTokens, ENCODER, events, CLOCK);
 
         user = new User();
         user.setId(7);
@@ -69,9 +67,9 @@ class PasswordServiceTest {
         when(otps.findFirstByUserIdOrderByCreatedAtDescIdDesc(7)).thenReturn(Optional.empty());
         when(otps.save(any())).thenAnswer(inv -> inv.getArgument(0));
         doAnswer(inv -> {
-            sentOtp.set(inv.getArgument(2));
+            sentOtp.set(((OtpMailRequested) inv.getArgument(0)).otp());
             return null;
-        }).when(mail).sendOtp(anyString(), anyString(), anyString(), anyLong());
+        }).when(events).publishEvent(any(OtpMailRequested.class));
     }
 
     /** Gửi OTP rồi để repository trả về đúng bản ghi vừa lưu. */
@@ -80,6 +78,7 @@ class PasswordServiceTest {
         ArgumentCaptor<PasswordOtp> saved = ArgumentCaptor.forClass(PasswordOtp.class);
         verify(otps).save(saved.capture());
         when(otps.findFirstByUserIdOrderByCreatedAtDescIdDesc(7)).thenReturn(Optional.of(saved.getValue()));
+        when(otps.findFirstForUpdateByUserIdOrderByCreatedAtDescIdDesc(7)).thenReturn(Optional.of(saved.getValue()));
         return saved.getValue();
     }
 
@@ -92,6 +91,10 @@ class PasswordServiceTest {
         assertThat(ENCODER.matches(sentOtp.get(), otp.getOtpHash())).isTrue();
         assertThat(otp.getExpiresAt()).isEqualTo(NOW.plusMinutes(5));
         verify(otps).invalidateAll(7, NOW);
+        ArgumentCaptor<OtpMailRequested> mail = ArgumentCaptor.forClass(OtpMailRequested.class);
+        verify(events).publishEvent(mail.capture());
+        assertThat(mail.getValue().email()).isEqualTo("thukho@tigernet.vn");
+        assertThat(mail.getValue().toString()).doesNotContain(sentOtp.get());
     }
 
     @Test
@@ -101,7 +104,7 @@ class PasswordServiceTest {
         service.forgotPassword("thukho@tigernet.vn");
 
         verify(otps, never()).save(any());
-        verify(mail, never()).sendOtp(anyString(), anyString(), anyString(), anyLong());
+        verify(events, never()).publishEvent(any());
     }
 
     @Test
@@ -116,10 +119,38 @@ class PasswordServiceTest {
     }
 
     @Test
-    void mailFailureReturnsServiceUnavailable() {
-        doThrow(new MailSendException("down")).when(mail).sendOtp(anyString(), anyString(), anyString(), anyLong());
-        assertThatThrownBy(() -> service.forgotPassword("thukho@tigernet.vn"))
-                .extracting(e -> ((BusinessException) e).getCode()).isEqualTo(ErrorCode.SERVICE_UNAVAILABLE);
+    void unknownAndKnownEmailBothRunBcryptOnce() {
+        PasswordEncoder counting = mock(PasswordEncoder.class);
+        when(counting.encode(any())).thenReturn("hash");
+        PasswordService s = new PasswordService(users, otps, refreshTokens, counting, events, CLOCK);
+
+        s.forgotPassword("khong-ton-tai@x.vn");
+        verify(counting, times(1)).encode(any());
+        s.forgotPassword("thukho@tigernet.vn");
+        verify(counting, times(2)).encode(any());
+    }
+
+    @Test
+    void verifyOtpReadsOtpWithRowLock() {
+        requestOtp();
+        String wrong = sentOtp.get().equals("000000") ? "111111" : "000000";
+        assertThatThrownBy(() -> service.verifyOtp("thukho@tigernet.vn", wrong))
+                .isInstanceOf(BusinessException.class);
+        verify(otps).findFirstForUpdateByUserIdOrderByCreatedAtDescIdDesc(7);
+    }
+
+    @Test
+    void reusedResetTokenIsRejected() {
+        PasswordOtp otp = requestOtp();
+        ResetTokenResponse res = service.verifyOtp("thukho@tigernet.vn", sentOtp.get());
+        // Lần 1: còn token. Lần 2 (request song song chờ khóa rồi đọc lại): token đã bị xóa → không tìm thấy.
+        when(otps.findForUpdateByResetTokenHash(otp.getResetTokenHash()))
+                .thenReturn(Optional.of(otp)).thenReturn(Optional.empty());
+        service.resetPassword(res.resetToken(), "New@12345");
+        assertThat(otp.getResetTokenHash()).isNull();
+
+        assertThatThrownBy(() -> service.resetPassword(res.resetToken(), "Other@12345"))
+                .extracting(e -> ((BusinessException) e).getCode()).isEqualTo(ErrorCode.RESET_TOKEN_INVALID);
     }
 
     @Test
@@ -131,7 +162,7 @@ class PasswordServiceTest {
         assertThat(otp.getUsedAt()).isEqualTo(NOW);
         assertThat(otp.getResetTokenHash()).isEqualTo(TokenHasher.sha256(res.resetToken()));
 
-        when(otps.findByResetTokenHash(otp.getResetTokenHash())).thenReturn(Optional.of(otp));
+        when(otps.findForUpdateByResetTokenHash(otp.getResetTokenHash())).thenReturn(Optional.of(otp));
         user.setLockedUntil(NOW.plusMinutes(3));
         service.resetPassword(res.resetToken(), "New@12345");
 
@@ -177,7 +208,7 @@ class PasswordServiceTest {
         otp.setUserId(7);
         otp.setResetTokenHash(TokenHasher.sha256("tok"));
         otp.setResetExpiresAt(NOW.minusSeconds(1));
-        when(otps.findByResetTokenHash(eq(TokenHasher.sha256("tok")))).thenReturn(Optional.of(otp));
+        when(otps.findForUpdateByResetTokenHash(eq(TokenHasher.sha256("tok")))).thenReturn(Optional.of(otp));
 
         assertThatThrownBy(() -> service.resetPassword("tok", "New@12345"))
                 .extracting(e -> ((BusinessException) e).getCode()).isEqualTo(ErrorCode.RESET_TOKEN_INVALID);
