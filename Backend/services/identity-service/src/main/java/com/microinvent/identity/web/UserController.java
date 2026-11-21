@@ -16,7 +16,6 @@ import com.microinvent.identity.web.dto.UserSummaryResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.time.LocalDate;
 import java.util.Set;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
@@ -59,7 +58,7 @@ public class UserController {
     @Operation(summary = "Lượng truy cập theo tháng (từ login_histories), mặc định năm hiện tại")
     @GetMapping("/stats/access")
     public ApiResponse<AccessStatsResponse> accessStats(@RequestParam(required = false) Integer year) {
-        return ApiResponse.ok(userService.accessStats(year != null ? year : LocalDate.now().getYear()));
+        return ApiResponse.ok(userService.accessStats(year));
     }
 
     @Operation(summary = "Tạo người dùng")

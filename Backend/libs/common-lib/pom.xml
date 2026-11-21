@@ -31,6 +31,12 @@
 			<optional>true</optional>
 		</dependency>
 		<dependency>
+			<!-- DataIntegrityViolationException cho GlobalExceptionHandler (service nào có JPA/JDBC cũng có sẵn) -->
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-tx</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
 			<groupId>org.springframework.data</groupId>
 			<artifactId>spring-data-commons</artifactId>
 			<optional>true</optional>

@@ -982,6 +982,38 @@ paths:
         '200': { $ref: '#/components/responses/InternalResult' }
         '409': { $ref: '#/components/responses/Conflict' }
 
+  /internal/warehouses/exists:
+    post:
+      tags: [Internal]
+      summary: Kiểm danh sách id kho có tồn tại / đã ngừng hoạt động
+      description: |
+        identity-service gọi trước khi gán kho / đổi kho mặc định cho người dùng (BUG-06, báo lỗi W3).
+        Tối đa 500 id; id trùng được gộp. Không đổi dữ liệu nên không cần Idempotency-Key.
+      security: [{ internalKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, maxItems: 500, items: { type: integer }, example: [1, 2, 987654] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      missing: { type: array, items: { type: integer }, description: Id không có kho nào, example: [987654] }
+                      closed: { type: array, items: { type: integer }, description: Id kho đã CLOSED, example: [2] }
+
 components:
   securitySchemes:
     bearerAuth:
