@@ -20,7 +20,9 @@ import com.microinvent.identity.web.dto.UserStatusRequest;
 import com.microinvent.identity.web.dto.UserSummaryResponse;
 import com.microinvent.identity.web.dto.WarehouseAccessRequest;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -55,11 +57,12 @@ public class UserService {
     private final UserScopeService scopeService;
     private final PasswordService passwordService;
     private final PasswordEncoder passwordEncoder;
+    private final WarehouseValidator warehouseValidator;
     private final Clock clock;
 
     public UserService(UserRepository users, RoleRepository roles, RefreshTokenRepository refreshTokens,
             LoginHistoryRepository loginHistories, UserScopeService scopeService, PasswordService passwordService,
-            PasswordEncoder passwordEncoder, Clock clock) {
+            PasswordEncoder passwordEncoder, WarehouseValidator warehouseValidator, Clock clock) {
         this.users = users;
         this.roles = roles;
         this.refreshTokens = refreshTokens;
@@ -67,6 +70,7 @@ public class UserService {
         this.scopeService = scopeService;
         this.passwordService = passwordService;
         this.passwordEncoder = passwordEncoder;
+        this.warehouseValidator = warehouseValidator;
         this.clock = clock;
     }
 
@@ -96,6 +100,7 @@ public class UserService {
         Role role = findRole(req.role());
         List<WarehouseAccessRequest> warehouses = req.warehouses() == null ? List.of() : req.warehouses();
         checkWarehouses(role, warehouses, req.defaultWarehouseId());
+        requireExistingWarehouses(warehouses, req.defaultWarehouseId());
 
         User u = new User();
         u.setUsername(username);
@@ -153,6 +158,7 @@ public class UserService {
     public UserDetailResponse assignWarehouses(Integer id, AssignWarehousesRequest req) {
         User u = scopeService.loadWithScope(id);
         checkWarehouses(u.getRole(), req.warehouses(), req.defaultWarehouseId());
+        requireExistingWarehouses(req.warehouses(), req.defaultWarehouseId());
         applyWarehouses(u, req.warehouses());
         u.setDefaultWarehouseId(req.defaultWarehouseId());
         return toDetail(u);
@@ -171,12 +177,18 @@ public class UserService {
         if (!u.getRole().isAllWarehouses() && !assigned) {
             throw new BusinessException(ErrorCode.WAREHOUSE_FORBIDDEN);
         }
+        if (!assigned) {
+            // Vai trò xem mọi kho (ADMIN, MANAGER...) chọn kho ngoài danh sách gán → kiểm kho có thật.
+            warehouseValidator.requireExisting(List.of(warehouseId));
+        }
         u.setDefaultWarehouseId(warehouseId);
         return UserScopeService.toMe(u);
     }
 
     @Transactional(readOnly = true)
-    public AccessStatsResponse accessStats(int year) {
+    public AccessStatsResponse accessStats(Integer requestedYear) {
+        // Năm mặc định lấy theo clock (múi giờ cấu hình) để test cố định được thời gian.
+        int year = requestedYear != null ? requestedYear : LocalDate.now(clock).getYear();
         if (year < 2000 || year > 2100) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "Năm không hợp lệ");
         }
@@ -220,6 +232,16 @@ public class UserService {
         if (defaultId != null && !role.isAllWarehouses() && !inList) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "Kho mặc định phải nằm trong danh sách kho được gán");
         }
+    }
+
+    /** Mọi kho trong danh sách gán + kho mặc định phải có thật và chưa ngừng hoạt động (gọi inventory-service). */
+    private void requireExistingWarehouses(List<WarehouseAccessRequest> warehouses, Integer defaultId) {
+        List<Integer> ids = new ArrayList<>(
+                warehouses.stream().map(WarehouseAccessRequest::warehouseId).toList());
+        if (defaultId != null) {
+            ids.add(defaultId);
+        }
+        warehouseValidator.requireExisting(ids);
     }
 
     private Role findRole(String code) {

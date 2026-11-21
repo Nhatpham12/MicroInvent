@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
@@ -61,6 +62,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleNotFound(NoResourceFoundException ex) {
         return build(ErrorCode.NOT_FOUND, ErrorCode.NOT_FOUND.defaultMessage(), null);
+    }
+
+    /**
+     * Vướng ràng buộc DB (UNIQUE, khóa ngoại...) – thường do 2 request tạo trùng gửi song song: cả hai cùng qua
+     * bước kiểm {@code existsBy…}, request sau vướng UNIQUE lúc INSERT. Đây là lỗi do dữ liệu client gửi lên
+     * nên trả 409 CONFLICT, không phải 500 (BUG-05). Service muốn báo rõ trường bị trùng thì tự bắt riêng.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException ex) {
+        Throwable root = ex.getMostSpecificCause();
+        log.warn("Vi phạm ràng buộc dữ liệu: {}", root.getMessage());
+        return build(ErrorCode.CONFLICT, "Dữ liệu đã tồn tại hoặc bị trùng, vui lòng tải lại và thử lại", null);
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
