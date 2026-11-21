@@ -1,0 +1,11 @@
+flowchart TD
+  A["Mở ứng dụng"] --> B["Màn Đăng nhập"]
+  B --> C{"Thông tin đúng?"}
+  C -->|Sai| D["Báo lỗi, đếm số lần sai"]
+  D --> E{"Sai 5 lần?"}
+  E -->|Có| F["Khóa 5 phút"] --> B
+  E -->|Không| B
+  C -->|Đúng| G["Vào Dashboard với kho mặc định"]
+  G --> H["Đổi kho làm việc ở header khi cần"]
+  B --> Q["Quên mật khẩu"]
+  Q --> Q1["Nhập email"] --> Q2["Nhập mã OTP"] --> Q3["Đặt mật khẩu mới"] --> B

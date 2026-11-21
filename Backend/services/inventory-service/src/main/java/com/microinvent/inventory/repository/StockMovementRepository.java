@@ -23,6 +23,13 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
     Page<StockMovement> search(boolean allWarehouses, Collection<Integer> ids, Integer productId,
             StockMovement.Type type, LocalDateTime from, LocalDateTime to, Pageable pageable);
 
+    /** Số lượng còn lại (tổng qty_change) mà 1 chứng từ đã đưa vào 1 kho cho 1 sản phẩm – giới hạn số đảo được. */
+    @Query("""
+            SELECT COALESCE(SUM(m.qtyChange), 0) FROM StockMovement m
+            WHERE m.refType = :refType AND m.refId = :refId AND m.productId = :productId AND m.warehouseId = :warehouseId
+            """)
+    long netQtyOfRef(StockMovement.RefType refType, Integer refId, Integer productId, Integer warehouseId);
+
     /** Biến động của 1 sản phẩm theo 1 chứng từ (dựng lịch sử của 1 serial: phiếu nhập, phiếu xuất…). */
     List<StockMovement> findByProductIdAndRefTypeAndRefIdOrderById(Integer productId, StockMovement.RefType refType,
             Integer refId);

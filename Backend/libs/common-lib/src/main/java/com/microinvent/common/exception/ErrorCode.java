@@ -18,6 +18,8 @@ public enum ErrorCode {
     WAREHOUSE_FORBIDDEN(HttpStatus.FORBIDDEN, "Không có quyền trên kho này"),
     INTERNAL_KEY_INVALID(HttpStatus.FORBIDDEN, "Sai khóa nội bộ"),
     TENANT_NOT_FOUND(HttpStatus.BAD_REQUEST, "Tenant không tồn tại"),
+    FILE_INVALID(HttpStatus.BAD_REQUEST, "File không hợp lệ"),
+    FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "File vượt quá dung lượng cho phép"),
     NOT_FOUND(HttpStatus.NOT_FOUND, "Không tìm thấy dữ liệu"),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "Phương thức không được hỗ trợ"),
     CONFLICT(HttpStatus.CONFLICT, "Dữ liệu bị xung đột"),

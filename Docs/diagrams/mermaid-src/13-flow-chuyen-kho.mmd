@@ -1,0 +1,15 @@
+stateDiagram-v2
+  [*] --> DRAFT
+  DRAFT --> PENDING_APPROVAL: Thủ kho gửi duyệt, giữ hàng
+  DRAFT --> APPROVED: Dưới ngưỡng thì tự duyệt
+  PENDING_APPROVAL --> APPROVED: Quản lý duyệt
+  PENDING_APPROVAL --> DRAFT: Quản lý từ chối, nhả hàng
+  APPROVED --> IN_TRANSIT: Kho nguồn xác nhận xuất
+  IN_TRANSIT --> RECEIVED: Kho đích nhận đủ
+  IN_TRANSIT --> DISCREPANCY: Nhận thiếu hoặc hỏng
+  DISCREPANCY --> COMPLETED: Quản lý xử lý sai lệch
+  RECEIVED --> COMPLETED: Đóng phiếu
+  DRAFT --> CANCELLED: Hủy
+  APPROVED --> CANCELLED: Hủy trước khi xuất
+  COMPLETED --> [*]
+  CANCELLED --> [*]

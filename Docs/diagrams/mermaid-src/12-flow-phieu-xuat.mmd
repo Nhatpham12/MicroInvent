@@ -1,0 +1,25 @@
+flowchart TD
+  A["Thủ kho / Bán hàng mở Phiếu xuất"] --> B["Bấm Tạo phiếu"]
+  B --> C["Chọn kho xuất và khách hàng"]
+  C --> D["Thêm dòng sản phẩm: số lượng, đơn giá"]
+  D --> E["Hệ thống kiểm tồn khả dụng theo thời gian thực"]
+  E --> F{"Đủ hàng ở kho xuất?"}
+
+  F -->|Đủ| G["Lưu phiếu, giữ hàng tại kho xuất, trạng thái Chờ xác nhận"]
+
+  F -->|Thiếu| H["Hiện bảng Tồn ở kho khác"]
+  H --> I{"Chọn cách xử lý"}
+  I -->|Tách phiếu| J["Tách thành phiếu theo từng kho còn hàng"]
+  I -->|Tạo phiếu chuyển| K["Tạo phiếu chuyển kho về kho xuất"]
+  I -->|Giảm số lượng| D
+  J --> G
+  K --> L["Chờ hàng chuyển về, rồi xuất"]
+  L --> G
+
+  G --> M["Xác nhận phiếu"]
+  M --> N["Xác nhận xuất: trừ tồn thực, ghi serial và bảo hành"]
+  N --> O["Trạng thái Đã xuất"]
+  O --> P["In phiếu xuất PDF"]
+
+  G --> X["Hủy phiếu, nhả hàng đang giữ"]
+  M --> X
