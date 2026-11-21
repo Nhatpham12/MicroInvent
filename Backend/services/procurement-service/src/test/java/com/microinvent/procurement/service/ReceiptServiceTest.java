@@ -68,9 +68,22 @@ class ReceiptServiceTest {
             return saved;
         });
         when(receipts.currentSequence("PNK", LocalDate.now().getYear())).thenReturn(12);
-        product(1, "ISR4331", true);
-        product(7, "CAT6", false);
+        product(1, "ISR4331", true, false);
+        product(7, "CAT6", false, false);
+        // Catalog giả: trả các SP có trong `catalogProducts`, id còn lại vào notFound.
+        when(catalog.products(any())).thenAnswer(inv -> {
+            List<Integer> ids = inv.<CatalogClient.ProductIds>getArgument(0).ids();
+            return JSON.valueToTree(Map.of("success", true, "data", Map.of(
+                    "products", ids.stream().filter(catalogProducts::containsKey).map(catalogProducts::get).toList(),
+                    "notFound", ids.stream().filter(i -> !catalogProducts.containsKey(i)).toList())));
+        });
+        when(catalog.partners(any())).thenReturn(JSON.valueToTree(Map.of("data",
+                Map.of("suppliers", List.of(), "customers", List.of()))));
+        supplier(3, false);
     }
+
+    /** Sản phẩm trong catalog giả theo id. */
+    private final Map<Integer, Map<String, Object>> catalogProducts = new java.util.HashMap<>();
 
     @AfterEach
     void tearDown() {
@@ -103,7 +116,6 @@ class ReceiptServiceTest {
         assertThatThrownBy(() -> service.create(new ReceiptRequest(1, null, null, null, null, null, null, null, null,
                 null, List.of(line(7, 1, "1", null))))).extracting("code").isEqualTo(ErrorCode.VALIDATION_ERROR);
 
-        when(catalog.getProduct(99)).thenThrow(new BusinessException(ErrorCode.NOT_FOUND, "Không tìm thấy sản phẩm"));
         assertThatThrownBy(() -> service.create(request(VatRate.NONE, line(99, 1, "1", null))))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(ex -> assertThat(((BusinessException) ex).getDetails())
@@ -112,6 +124,40 @@ class ReceiptServiceTest {
         assertThatThrownBy(() -> service.create(new ReceiptRequest(2, null, 3, null, null, null, null, null, null,
                 null, List.of(line(7, 1, "1", null))))).extracting("code").isEqualTo(ErrorCode.WAREHOUSE_FORBIDDEN);
         verify(receipts, never()).save(any());
+    }
+
+    @Test
+    void createRejectsUnknownOrDeletedSupplierProductAndCustomer() {
+        assertThatThrownBy(() -> service.create(new ReceiptRequest(1, null, 999, null, null, null, null, null, null,
+                null, List.of(line(7, 1, "1", null)))))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getDetails())
+                        .isEqualTo(Map.of("supplierId", "Nhà cung cấp 999 không tồn tại")));
+
+        supplier(5, true);
+        assertThatThrownBy(() -> service.create(new ReceiptRequest(1, null, 5, null, null, null, null, null, null,
+                null, List.of(line(7, 1, "1", null))))).extracting("code").isEqualTo(ErrorCode.VALIDATION_ERROR);
+
+        product(8, "OLD", false, true);
+        assertThatThrownBy(() -> service.create(request(VatRate.NONE, line(8, 1, "1", null))))
+                .satisfies(ex -> assertThat(((BusinessException) ex).getDetails())
+                        .isEqualTo(Map.of("lines", "Sản phẩm 8 không tồn tại")));
+
+        when(catalog.partners(new CatalogClient.PartnerIds(null, List.of(42))))
+                .thenReturn(JSON.valueToTree(Map.of("data", Map.of("customers", List.of()))));
+        assertThatThrownBy(() -> service.create(new ReceiptRequest(1, GoodsReceipt.SourceType.RETAIL_CUSTOMER, null,
+                42, null, null, null, null, null, null, List.of(line(7, 1, "1", null)))))
+                .satisfies(ex -> assertThat(((BusinessException) ex).getDetails())
+                        .isEqualTo(Map.of("customerId", "Khách hàng 42 không tồn tại")));
+        verify(receipts, never()).save(any());
+    }
+
+    @Test
+    void createLoadsAllProductsInOneCatalogCall() {
+        service.create(request(VatRate.NONE, line(1, 1, "1", List.of("SN-1")), line(7, 1, "1", null),
+                line(7, 2, "1", null)));
+
+        verify(catalog).products(new CatalogClient.ProductIds(List.of(1, 7)));
     }
 
     @Test
@@ -211,9 +257,14 @@ class ReceiptServiceTest {
         return saved;
     }
 
-    private void product(int id, String code, boolean hasSerial) {
-        when(catalog.getProduct(id)).thenReturn(JSON.valueToTree(Map.of("success", true, "data",
-                Map.of("id", id, "code", code, "name", "SP " + code, "unit", "cái", "hasSerial", hasSerial))));
+    private void product(int id, String code, boolean hasSerial, boolean deleted) {
+        catalogProducts.put(id, Map.of("id", id, "code", code, "name", "SP " + code, "unit", "cái",
+                "hasSerial", hasSerial, "deleted", deleted));
+    }
+
+    private void supplier(int id, boolean deleted) {
+        when(catalog.partners(new CatalogClient.PartnerIds(List.of(id), null))).thenReturn(JSON.valueToTree(Map.of(
+                "data", Map.of("suppliers", List.of(Map.of("id", id, "code", "NCC" + id, "deleted", deleted))))));
     }
 
     private static ReceiptRequest request(VatRate vat, ReceiptRequest.Line... lines) {

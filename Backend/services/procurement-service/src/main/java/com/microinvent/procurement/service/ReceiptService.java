@@ -178,6 +178,7 @@ public class ReceiptService {
         }
         Map<Integer, Map<String, Object>> products = loadProducts(req.lines());
         checkSerials(req.lines(), products);
+        checkPartner(source, req.supplierId(), req.customerId());
 
         r.setWarehouseId(req.warehouseId());
         r.setSourceType(source);
@@ -213,26 +214,48 @@ public class ReceiptService {
         r.setTotalAmount(subtotal.add(vat));
     }
 
+    /** Snapshot sản phẩm (1 lần gọi catalog cho cả phiếu); sản phẩm không có hoặc đã xóa mềm → 400. */
     private Map<Integer, Map<String, Object>> loadProducts(List<ReceiptRequest.Line> lines) {
+        List<Integer> ids = lines.stream().map(ReceiptRequest.Line::productId).distinct().toList();
+        JsonNode data = downstream(() -> catalog.products(new CatalogClient.ProductIds(ids))).path("data");
         Map<Integer, Map<String, Object>> result = new LinkedHashMap<>();
-        for (Integer productId : lines.stream().map(ReceiptRequest.Line::productId).distinct().toList()) {
-            JsonNode p;
-            try {
-                p = downstream(() -> catalog.getProduct(productId)).path("data");
-            } catch (BusinessException ex) {
-                if (ex.getCode() == ErrorCode.NOT_FOUND) {
-                    throw invalid("lines", "Sản phẩm " + productId + " không tồn tại");
-                }
-                throw ex;
+        for (JsonNode p : data.path("products")) {
+            if (p.path("deleted").asBoolean()) {
+                continue;
             }
             Map<String, Object> snapshot = new LinkedHashMap<>();
             snapshot.put("code", p.path("code").asText());
             snapshot.put("name", p.path("name").asText());
             snapshot.put("unit", p.path("unit").asText());
             snapshot.put("hasSerial", p.path("hasSerial").asBoolean());
-            result.put(productId, snapshot);
+            result.put(p.path("id").asInt(), snapshot);
+        }
+        for (Integer id : ids) {
+            if (!result.containsKey(id)) {
+                throw invalid("lines", "Sản phẩm " + id + " không tồn tại");
+            }
         }
         return result;
+    }
+
+    /** NCC (nguồn SUPPLIER) / khách (nguồn RETAIL_CUSTOMER) phải có thật và chưa bị xóa mềm. */
+    private void checkPartner(GoodsReceipt.SourceType source, Integer supplierId, Integer customerId) {
+        boolean supplier = source == GoodsReceipt.SourceType.SUPPLIER;
+        if (!supplier && source != GoodsReceipt.SourceType.RETAIL_CUSTOMER) {
+            return;
+        }
+        Integer id = supplier ? supplierId : customerId;
+        CatalogClient.PartnerIds req = supplier ? new CatalogClient.PartnerIds(List.of(id), null)
+                : new CatalogClient.PartnerIds(null, List.of(id));
+        JsonNode found = downstream(() -> catalog.partners(req)).path("data").path(supplier ? "suppliers" : "customers");
+        boolean ok = false;
+        for (JsonNode p : found) {
+            ok |= p.path("id").asInt() == id && !p.path("deleted").asBoolean();
+        }
+        if (!ok) {
+            throw supplier ? invalid("supplierId", "Nhà cung cấp " + id + " không tồn tại")
+                    : invalid("customerId", "Khách hàng " + id + " không tồn tại");
+        }
     }
 
     /** Sản phẩm có serial: số serial = số lượng; không serial: không nhận serial; serial không lặp trong phiếu. */
