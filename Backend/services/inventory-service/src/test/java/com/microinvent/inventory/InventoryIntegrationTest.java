@@ -135,6 +135,34 @@ class InventoryIntegrationTest {
     }
 
     @Test
+    void concurrentReversesOfSameReceiptOnlyOneWins() throws Exception {
+        int product = PRODUCT.getAndIncrement();
+        StockReceiveRequest receipt = new StockReceiveRequest(warehouseId, StockMovement.RefType.RECEIPT,
+                REF.getAndIncrement(), 1, List.of(line(product, 10, null, BigDecimal.TEN)));
+        stock.receive(receipt);
+        receive(product, 10, null); // tồn của phiếu khác: không được để chặn "không đủ khả dụng" che lỗi
+
+        List<Object> results = runConcurrently(2, i -> () -> stock.reverse(receipt));
+
+        assertThat(results).filteredOn(r -> !(r instanceof BusinessException)).hasSize(1);
+        assertThat(results).filteredOn(r -> r instanceof BusinessException).singleElement()
+                .extracting(r -> ((BusinessException) r).getCode()).isEqualTo(ErrorCode.CONFLICT);
+        assertThat(balance(product).getQtyOnHand()).isEqualTo(10);
+    }
+
+    @Test
+    void concurrentReservesForSameDocumentHoldOnlyOnce() throws Exception {
+        int product = PRODUCT.getAndIncrement();
+        receive(product, 10, null);
+        StockReserveRequest req = reserve(product, 2, null);
+
+        List<Object> results = runConcurrently(6, i -> () -> stock.reserve(req));
+
+        assertThat(results).filteredOn(r -> !(r instanceof BusinessException)).hasSize(1);
+        assertThat(balance(product).getQtyHold()).isEqualTo(2);
+    }
+
+    @Test
     void closeCheckAndLowStockQueriesRunOnRealSchema() {
         int product = PRODUCT.getAndIncrement();
         receive(product, 3, null);
