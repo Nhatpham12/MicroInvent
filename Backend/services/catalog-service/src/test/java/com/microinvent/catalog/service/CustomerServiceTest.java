@@ -22,6 +22,8 @@ import org.junit.jupiter.api.Test;
 
 class CustomerServiceTest {
 
+    private final CatalogAudit audit = org.mockito.Mockito.mock(CatalogAudit.class);
+
     private CustomerRepository repo;
     private FieldEncryptor enc;
     private CustomerService service;
@@ -30,7 +32,7 @@ class CustomerServiceTest {
     void setUp() {
         repo = mock(CustomerRepository.class);
         enc = new FieldEncryptor(FieldEncryptorTest.KEY);
-        service = new CustomerService(repo, enc);
+        service = new CustomerService(repo, enc, audit);
         when(repo.saveAndFlush(any())).thenAnswer(inv -> {
             Customer c = inv.getArgument(0);
             c.setId(12);

@@ -1,1 +1,2 @@
 com.microinvent.tenant.starter.TenantDataSourceAutoConfiguration
+com.microinvent.tenant.outbox.OutboxAutoConfiguration

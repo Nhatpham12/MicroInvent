@@ -24,6 +24,8 @@ import org.springframework.data.domain.Pageable;
 
 class ProductServiceTest {
 
+    private final CatalogAudit audit = org.mockito.Mockito.mock(CatalogAudit.class);
+
     private ProductRepository products;
     private ProductGroupRepository groups;
     private ProductService service;
@@ -33,7 +35,7 @@ class ProductServiceTest {
     void setUp() {
         products = mock(ProductRepository.class);
         groups = mock(ProductGroupRepository.class);
-        service = new ProductService(products, groups);
+        service = new ProductService(products, groups, audit);
         router = new ProductGroup();
         router.setId(1);
         router.setCode("CISCO_ROUTER");
@@ -65,6 +67,15 @@ class ProductServiceTest {
         assertThat(res.groupCode()).isEqualTo("CISCO_ROUTER");
         assertThat(res.hasSerial()).isTrue();
         assertThat(res.description()).isNull();
+        // GAP-01: ghi nhật ký thao tác qua outbox
+        verify(audit).record("CREATE", "PRODUCT", res.id(), null, res);
+    }
+
+    @Test
+    void failedCreateWritesNoAudit() {
+        when(products.existsByCodeIgnoreCase("ISR-4331")).thenReturn(true);
+        code(() -> service.create(req("isr-4331", 1)));
+        verify(audit, never()).record(any(), any(), any(), any(), any());
     }
 
     @Test

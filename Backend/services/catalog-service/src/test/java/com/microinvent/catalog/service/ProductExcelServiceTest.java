@@ -31,6 +31,8 @@ import org.springframework.mock.web.MockMultipartFile;
 
 class ProductExcelServiceTest {
 
+    private final CatalogAudit audit = org.mockito.Mockito.mock(CatalogAudit.class);
+
     private ProductRepository products;
     private ProductGroupRepository groups;
     private ProductExcelService service;
@@ -42,7 +44,7 @@ class ProductExcelServiceTest {
         groups = mock(ProductGroupRepository.class);
         service = new ProductExcelService(products, groups,
                 Validation.buildDefaultValidatorFactory().getValidator(),
-                new CatalogProperties("k", null, null, 3, null));
+                new CatalogProperties("k", null, null, 3, null), audit);
         router = new ProductGroup();
         router.setId(1);
         router.setCode("CISCO_ROUTER");
