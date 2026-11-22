@@ -17,8 +17,11 @@ npm run dev
 - `/catalog/groups`
 - `/catalog/suppliers`
 - `/catalog/customers`
+- `/receipts` — receipt list, draft creation/editing, details, confirm/cancel
+- `/admin/users` — user and warehouse-permission management screens
 
-Catalog screens currently use local sample data. Create and edit actions only update the current browser session; API integration is not connected yet.
+Catalog, receipt, and user-management screens currently use local sample data.
+Changes only update the current browser session; API integration is not connected yet.
 
 ## Validation
 
