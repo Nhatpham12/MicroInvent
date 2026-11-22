@@ -9,12 +9,13 @@ const navigation = [
   { label: 'Nhà cung cấp', icon: '⌂', to: '/catalog/suppliers', enabled: true },
   { label: 'Khách hàng', icon: '♙', to: '/catalog/customers', enabled: true },
   { label: 'Danh mục kho', icon: '▧', to: '/warehouses', enabled: false },
-  { label: 'Phiếu nhập', icon: '↓', to: '/receipts', enabled: false },
+  { label: 'Phiếu nhập', icon: '↓', to: '/receipts', enabled: true },
   { label: 'Phiếu xuất', icon: '↑', to: '/exports', enabled: false },
   { label: 'Chuyển kho', icon: '⇄', to: '/transfers', enabled: false },
   { label: 'Thuê / mượn', icon: '◷', to: '/rentals', enabled: false },
   { label: 'Kiểm kê', icon: '☷', to: '/stocktakes', enabled: false },
   { label: 'Báo cáo', icon: '▥', to: '/reports', enabled: false },
+  { label: 'Người dùng & quyền', icon: '♙', to: '/admin/users', enabled: true },
 ]
 
 type AppShellProps = {
@@ -53,7 +54,7 @@ export function AppShell({ activePath, children }: AppShellProps) {
       <aside className="app-sidebar" aria-label="Điều hướng chính">
         <nav className="sidebar-nav">
           {navigation.map((item) => {
-            const active = activePath === item.to
+            const active = activePath === item.to || activePath.startsWith(`${item.to}/`)
             const content = (
               <>
                 <span className="sidebar-icon" aria-hidden="true">
