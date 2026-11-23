@@ -39,6 +39,7 @@
 		<jjwt.version>0.13.0</jjwt.version>
 		<mapstruct.version>1.6.3</mapstruct.version>
 		<poi.version>5.4.1</poi.version>
+		<shedlock.version>5.16.0</shedlock.version>
 	</properties>
 
 	<dependencyManagement>
@@ -99,6 +100,16 @@
 				<groupId>org.apache.poi</groupId>
 				<artifactId>poi-ooxml</artifactId>
 				<version>${poi.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>net.javacrumbs.shedlock</groupId>
+				<artifactId>shedlock-spring</artifactId>
+				<version>${shedlock.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>net.javacrumbs.shedlock</groupId>
+				<artifactId>shedlock-provider-jdbc-template</artifactId>
+				<version>${shedlock.version}</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
