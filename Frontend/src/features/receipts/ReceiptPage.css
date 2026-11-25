@@ -168,6 +168,7 @@
 }
 
 .receipt-table-scroll {
+  min-width: 0;
   overflow-x: auto;
 }
 
@@ -268,9 +269,11 @@
 .receipt-form {
   display: grid;
   gap: 16px;
+  min-width: 0;
 }
 
 .receipt-form-card {
+  min-width: 0;
   padding: 20px;
 }
 
@@ -349,11 +352,21 @@
 
 .receipt-line {
   display: grid;
-  grid-template-columns: 28px minmax(200px, 2fr) 80px minmax(130px, 1fr) minmax(130px, 1fr) minmax(190px, 1.5fr) minmax(160px, 1fr) 28px;
+  grid-template-columns: 24px minmax(0, 1.8fr) minmax(56px, 0.6fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr) 28px;
   align-items: end;
-  gap: 10px;
+  gap: 8px;
   border-bottom: 1px solid #f0f0f0;
   padding-bottom: 14px;
+}
+
+.receipt-line .receipt-field {
+  min-width: 0;
+}
+
+.receipt-line .receipt-field input,
+.receipt-line .receipt-field select,
+.receipt-line .receipt-field textarea {
+  min-width: 0;
 }
 
 .receipt-line-number {
@@ -428,6 +441,15 @@
   font-size: 13px;
 }
 
+.receipt-edit-warning {
+  border: 1px solid #ffe58f;
+  border-radius: 6px;
+  padding: 12px 14px;
+  color: #874d00;
+  background: #fffbe6;
+  font-size: 13px;
+}
+
 .receipt-form-actions {
   justify-content: flex-end;
   padding-bottom: 24px;
@@ -449,6 +471,7 @@
 .receipt-detail-side {
   display: grid;
   gap: 16px;
+  min-width: 0;
 }
 
 .receipt-info-grid {
@@ -541,11 +564,15 @@
 
 @media (max-width: 1100px) {
   .receipt-line {
-    grid-template-columns: 28px minmax(190px, 2fr) 76px minmax(120px, 1fr) minmax(130px, 1fr) minmax(180px, 1.5fr) 28px;
+    grid-template-columns: 24px minmax(0, 1.5fr) 56px minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1.1fr) minmax(0, 1fr) 28px;
+  }
+
+  .receipt-line > .receipt-field:nth-of-type(5) {
+    grid-column: 2 / span 3;
   }
 
   .receipt-line > .receipt-field:nth-of-type(6) {
-    grid-column: 2 / span 3;
+    grid-column: 5 / span 3;
   }
 
   .receipt-detail-grid {
@@ -600,7 +627,9 @@
     grid-column: 3;
   }
 
-  .receipt-line > .receipt-field:nth-of-type(n + 4) {
+  .receipt-line > .receipt-field:nth-of-type(4),
+  .receipt-line > .receipt-field:nth-of-type(5),
+  .receipt-line > .receipt-field:nth-of-type(6) {
     grid-column: 2 / 4;
   }
 
