@@ -1,0 +1,755 @@
+.export-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  padding: 28px 32px 40px;
+  color: #172033;
+}
+
+.export-title-row,
+.export-detail-heading,
+.export-section-heading,
+.export-form-actions,
+.export-shortage-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.export-title-row h1,
+.export-detail-heading h1 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+.export-breadcrumb {
+  margin: 0 0 6px;
+  color: #7a8497;
+  font-size: 13px;
+}
+
+.export-button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 0 15px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.export-button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.export-button-primary {
+  color: #fff;
+  background: #315ed2;
+}
+
+.export-button-primary:hover:not(:disabled) {
+  background: #254db6;
+}
+
+.export-button-secondary {
+  color: #344054;
+  border-color: #d7dce5;
+  background: #fff;
+}
+
+.export-button-secondary:hover:not(:disabled) {
+  background: #f7f8fa;
+}
+
+.export-button-danger {
+  color: #b42318;
+  border-color: #f1c5c2;
+  background: #fff;
+}
+
+.export-filter-card,
+.export-card {
+  min-width: 0;
+  border: 1px solid #e3e7ee;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(16 24 40 / 3%);
+}
+
+.export-filter-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+
+.export-search {
+  display: flex;
+  min-width: 220px;
+  height: 40px;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d7dce5;
+  border-radius: 7px;
+  padding: 0 11px;
+  color: #778196;
+}
+
+.export-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: #172033;
+  font: inherit;
+  font-size: 14px;
+}
+
+.export-filter-card select,
+.export-form select,
+.export-form input,
+.export-form textarea,
+.export-lines-table input,
+.export-lines-table select {
+  min-width: 0;
+  height: 40px;
+  border: 1px solid #d7dce5;
+  border-radius: 6px;
+  padding: 0 10px;
+  color: #344054;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+}
+
+.export-filter-card select {
+  min-width: 165px;
+}
+
+.export-card {
+  overflow: hidden;
+}
+
+.export-tabs {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  border-bottom: 1px solid #e8ebf0;
+  padding: 0 20px;
+}
+
+.export-tabs button {
+  position: relative;
+  min-height: 48px;
+  border: 0;
+  padding: 0 2px;
+  color: #687386;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.export-tabs button.is-active {
+  color: #315ed2;
+  font-weight: 600;
+}
+
+.export-tabs button.is-active::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: #315ed2;
+  content: '';
+}
+
+.export-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.export-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.export-table th,
+.export-table td {
+  border-bottom: 1px solid #edf0f4;
+  padding: 13px 15px;
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.export-table th {
+  color: #687386;
+  background: #fafbfc;
+  font-weight: 600;
+}
+
+.export-table td {
+  color: #344054;
+}
+
+.export-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.export-code-link,
+.export-row-action {
+  color: #315ed2;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.export-code-link:hover,
+.export-row-action:hover {
+  text-decoration: underline;
+}
+
+.export-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-pending {
+  color: #946200;
+  background: #fff4d6;
+}
+
+.status-confirmed {
+  color: #175cd3;
+  background: #eff8ff;
+}
+
+.status-exported {
+  color: #067647;
+  background: #ecfdf3;
+}
+
+.status-cancelled {
+  color: #b42318;
+  background: #fef3f2;
+}
+
+.export-no-results {
+  height: 110px;
+  color: #7a8497 !important;
+  text-align: center;
+}
+
+.export-pagination {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #edf0f4;
+  padding: 0 18px;
+  color: #7a8497;
+  font-size: 13px;
+}
+
+.export-page-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.export-page-buttons button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #d7dce5;
+  border-radius: 6px;
+  color: #344054;
+  background: #fff;
+}
+
+.export-page-buttons button[aria-current="page"] {
+  color: #fff;
+  border-color: #315ed2;
+  background: #315ed2;
+}
+
+.export-page-buttons button:disabled {
+  color: #aab1be;
+}
+
+.export-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.export-form-card,
+.export-detail-card {
+  padding: 20px;
+}
+
+.export-form-card h2,
+.export-detail-card h2,
+.export-shortage-card h2 {
+  margin: 0 0 17px;
+  color: #202b3c;
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.export-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.export-form-grid label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.export-form-grid label b {
+  color: #d92d20;
+}
+
+.export-form-grid input,
+.export-form-grid select,
+.export-form-grid textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.export-form-grid textarea {
+  height: auto;
+  min-height: 64px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.export-note-field {
+  grid-column: span 2;
+}
+
+.export-section-heading {
+  margin-bottom: 14px;
+}
+
+.export-section-heading h2 {
+  margin: 0;
+}
+
+.export-lines-table {
+  min-width: 1000px;
+}
+
+.export-lines-table input,
+.export-lines-table select {
+  width: 100%;
+  max-width: 260px;
+  height: 36px;
+}
+
+.export-lines-table td:nth-child(2) {
+  min-width: 210px;
+}
+
+.export-lines-table td:nth-child(3) {
+  min-width: 210px;
+}
+
+.export-lines-table td:nth-child(3) input {
+  max-width: 220px;
+}
+
+.export-lines-table td:nth-child(5),
+.export-lines-table td:nth-child(6) {
+  min-width: 95px;
+}
+
+.export-lines-table input:disabled {
+  color: #98a2b3;
+  background: #f7f8fa;
+}
+
+.export-icon-button {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #f1c5c2;
+  border-radius: 6px;
+  color: #b42318;
+  background: #fff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.export-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: .4;
+}
+
+.export-shortage-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid #f2d38a;
+  border-radius: 9px;
+  padding: 18px;
+  background: #fffcf4;
+}
+
+.export-shortage-card h2 {
+  margin-bottom: 5px;
+  color: #875b00;
+}
+
+.export-shortage-card p {
+  margin: 0;
+  color: #735b2a;
+  font-size: 13px;
+}
+
+.export-shortage-card .export-table th {
+  background: #fff8e7;
+}
+
+.export-shortage-actions {
+  justify-content: flex-start;
+}
+
+.export-form-bottom {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.export-total-card {
+  display: flex;
+  width: min(100%, 360px);
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px;
+}
+
+.export-total-card > div,
+.export-payment-card > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: #687386;
+  font-size: 14px;
+}
+
+.export-total-card strong,
+.export-payment-card strong {
+  color: #344054;
+  font-weight: 600;
+}
+
+.export-total-card .export-grand-total,
+.export-payment-card .export-payment-balance {
+  border-top: 1px solid #edf0f4;
+  padding-top: 12px;
+  color: #202b3c;
+  font-weight: 650;
+}
+
+.export-total-card .export-grand-total strong,
+.export-payment-card .export-payment-balance strong {
+  color: #202b3c;
+  font-size: 16px;
+}
+
+.export-form-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 14px;
+}
+
+.export-form-hint {
+  margin: -8px 0 0;
+  color: #7a8497;
+  font-size: 12px;
+}
+
+.export-detail-title,
+.export-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.export-detail-heading {
+  align-items: flex-start;
+}
+
+.export-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  align-items: start;
+  gap: 20px;
+}
+
+.export-detail-main,
+.export-detail-aside {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.export-info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px 14px;
+  margin: 0;
+}
+
+.export-info-grid div,
+.export-summary div {
+  min-width: 0;
+}
+
+.export-info-grid dt,
+.export-summary dt {
+  margin-bottom: 5px;
+  color: #7a8497;
+  font-size: 12px;
+}
+
+.export-info-grid dd,
+.export-summary dd {
+  overflow-wrap: anywhere;
+  margin: 0;
+  color: #344054;
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.export-table td small {
+  display: block;
+  margin-top: 3px;
+  color: #7a8497;
+}
+
+.export-payment-card {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.export-payment-card h2 {
+  margin-bottom: 2px;
+}
+
+.export-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.export-timeline li {
+  position: relative;
+  display: flex;
+  min-height: 55px;
+  gap: 12px;
+}
+
+.export-timeline li:not(:last-child)::after {
+  position: absolute;
+  top: 13px;
+  bottom: -1px;
+  left: 5px;
+  width: 1px;
+  background: #e3e7ee;
+  content: '';
+}
+
+.export-timeline-dot {
+  z-index: 1;
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
+  margin-top: 3px;
+  border: 2px solid #c8ced8;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.export-timeline li.is-done .export-timeline-dot {
+  border-color: #315ed2;
+  background: #315ed2;
+}
+
+.export-timeline li > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.export-timeline strong {
+  color: #344054;
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.export-timeline time {
+  color: #7a8497;
+  font-size: 12px;
+}
+
+.export-detail-card > p {
+  margin: 0;
+  color: #687386;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.export-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+}
+
+.export-empty {
+  max-width: 640px;
+  margin: 80px auto;
+  border: 1px solid #e3e7ee;
+  border-radius: 10px;
+  padding: 30px;
+  background: #fff;
+  text-align: center;
+}
+
+.export-empty h1 {
+  margin: 0 0 10px;
+  font-size: 22px;
+}
+
+.export-empty p {
+  margin: 0 0 20px;
+  color: #687386;
+}
+
+@media (max-width: 1050px) {
+  .export-page {
+    padding: 24px 20px 32px;
+  }
+
+  .export-detail-grid {
+    grid-template-columns: minmax(0, 1fr) 280px;
+  }
+
+  .export-filter-card {
+    flex-wrap: wrap;
+  }
+
+  .export-search {
+    flex-basis: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .export-page {
+    gap: 16px;
+    padding: 18px 14px 28px;
+  }
+
+  .export-title-row,
+  .export-detail-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .export-title-row h1,
+  .export-detail-heading h1 {
+    font-size: 22px;
+  }
+
+  .export-detail-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .export-detail-actions .export-button {
+    flex: 1;
+  }
+
+  .export-filter-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .export-filter-card select,
+  .export-filter-card .export-button {
+    width: 100%;
+  }
+
+  .export-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .export-note-field {
+    grid-column: auto;
+  }
+
+  .export-form-card,
+  .export-detail-card {
+    padding: 16px;
+  }
+
+  .export-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .export-info-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .export-form-actions {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .export-form-actions .export-button {
+    flex: 1 1 130px;
+  }
+}
+
+@media print {
+  .export-page {
+    padding: 0;
+  }
+
+  .export-detail-actions,
+  .export-shortage-actions {
+    display: none;
+  }
+}
