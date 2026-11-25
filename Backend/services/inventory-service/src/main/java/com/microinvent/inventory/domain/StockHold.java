@@ -61,4 +61,8 @@ public class StockHold {
 
     @Column(name = "expires_at")
     private LocalDateTime expiresAt;
+
+    /** Giữ lúc nào (DB tự ghi). */
+    @Column(name = "created_at", insertable = false, updatable = false)
+    private LocalDateTime createdAt;
 }

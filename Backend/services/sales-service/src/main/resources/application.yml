@@ -1,5 +1,6 @@
 server:
   port: ${PORT:8085}
+  forward-headers-strategy: framework
 
 spring:
   application:
@@ -36,3 +37,13 @@ microinvent:
     url-template: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/sales_%s?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Ho_Chi_Minh
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:root}
+  internal:
+    # Bắt buộc đặt INTERNAL_API_KEY; thiếu thì service không khởi động.
+    api-key: ${INTERNAL_API_KEY}
+  clients:
+    # Để trống = tìm qua Eureka (lb://<service>); đặt URL khi chạy không có Eureka.
+    inventory-url: ${INVENTORY_URL:}
+    catalog-url: ${CATALOG_URL:}
+  outbox:
+    # export.exported... ghi outbox_events cùng transaction, OutboxRelay (tenant-starter) đẩy lên RabbitMQ
+    enabled: true

@@ -16,6 +16,9 @@ public interface StockItemRepository extends JpaRepository<StockItem, Long> {
     /** Serial đã có trong hệ thống (ở bất kỳ kho / trạng thái nào). */
     Optional<StockItem> findBySerial(String serial);
 
+    /** Sản phẩm đã từng nhập serial = sản phẩm quản lý serial (inventory không lưu cờ has_serial của catalog). */
+    boolean existsByProductId(Integer productId);
+
     /**
      * Đơn vị có serial đang nằm trong các kho được xem; lọc sản phẩm / trạng thái / một phần serial.
      * {@code keyword} đã chuẩn hóa dạng "%abc%" chữ thường, ký tự đại diện đã thoát bằng '!'.

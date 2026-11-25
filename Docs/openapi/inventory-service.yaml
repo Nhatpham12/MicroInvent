@@ -421,8 +421,11 @@ paths:
   /api/v1/stocks/damaged:
     post:
       tags: [Stock]
-      summary: Đánh dấu hàng hư hỏng tại kho (qty_damaged)
-      parameters: [{ $ref: '#/components/parameters/WarehouseHeader' }]
+      summary: Đánh dấu hàng hư hỏng tại kho (STOREKEEPER, MANAGER)
+      description: |
+        Chuyển `qty` từ khả dụng sang `qty_damaged` (tồn thực không đổi). Sản phẩm quản lý serial (đã từng nhập serial)
+        phải chỉ đúng serial, serial chuyển sang DAMAGED. Nhật ký ghi loại DAMAGED, refType MANUAL, refId 0,
+        `qtyChange` = số chuyển, `qtyBefore` / `qtyAfter` = số lượng hỏng trước / sau.
       requestBody:
         required: true
         content:
@@ -434,24 +437,45 @@ paths:
                 warehouseId: { type: integer }
                 productId: { type: integer }
                 qty: { type: integer, minimum: 1 }
-                serials: { type: array, items: { type: string } }
-                note: { type: string }
+                serials: { type: array, maxItems: 200, items: { type: string }, description: 'Bắt buộc với SP có serial (số serial = qty)' }
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Tồn sau khi đánh dấu hỏng
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          productId: { type: integer }
+                          warehouseId: { type: integer }
+                          onHand: { type: integer }
+                          hold: { type: integer }
+                          damaged: { type: integer }
+                          available: { type: integer }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/StockNotEnough' }
 
   # ------------------------------------------------------------------ Giữ hàng
   /api/v1/holds:
     get:
       tags: [Holds]
-      summary: Danh sách giữ hàng (ai giữ, cho khách nào, đến khi nào)
+      summary: Danh sách giữ hàng (ai giữ, cho khách nào, đến khi nào) – mọi vai trò, theo phạm vi kho
+      description: Không truyền warehouseId → mọi kho được xem; kho không được gán → 403. Gồm cả giữ thủ công và giữ cho chứng từ.
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
+        - { name: sort, in: query, description: 'id | expiresAt | createdAt | productId | warehouseId (mặc định id,desc); trường khác → 400', schema: { type: string, example: 'expiresAt,asc' } }
         - { name: warehouseId, in: query, schema: { type: integer } }
         - { name: productId, in: query, schema: { type: integer } }
+        - { name: customerId, in: query, schema: { type: integer } }
         - { name: status, in: query, schema: { $ref: '#/components/schemas/HoldStatus' } }
-        - { name: mine, in: query, schema: { type: boolean } }
+        - { name: refType, in: query, schema: { $ref: '#/components/schemas/HoldRefType' } }
       responses:
         '200':
           description: OK
@@ -468,8 +492,10 @@ paths:
                               content: { type: array, items: { $ref: '#/components/schemas/Hold' } }
     post:
       tags: [Holds]
-      summary: Giữ hàng cho khách (trừ tồn khả dụng; mặc định hết hạn sau HOLD_DAYS)
-      parameters: [{ $ref: '#/components/parameters/WarehouseHeader' }]
+      summary: Giữ hàng tại kho cho khách (SALES, STOREKEEPER, MANAGER)
+      description: |
+        Trừ tồn khả dụng ngay (refType MANUAL). Hàng có serial: mỗi serial 1 lượt giữ (qty = 1) → trả mảng.
+        `expiresAt` bỏ trống = sau `microinvent.hold.default-days` ngày (mặc định 3); quá hạn thì HoldExpiryJob tự nhả (EXPIRED).
       requestBody:
         required: true
         content:
@@ -481,10 +507,10 @@ paths:
                 warehouseId: { type: integer }
                 productId: { type: integer }
                 qty: { type: integer, minimum: 1 }
-                serials: { type: array, items: { type: string }, description: Bắt buộc với SP có serial }
-                customerId: { type: integer }
-                expiresAt: { type: string, format: date-time }
-                note: { type: string }
+                serials: { type: array, maxItems: 200, items: { type: string }, description: 'Bắt buộc với SP có serial (số serial = qty)' }
+                customerId: { type: integer, nullable: true }
+                customerName: { type: string, maxLength: 255, nullable: true, description: Hiển thị "giữ cho ai" }
+                expiresAt: { type: string, format: date-time, nullable: true, description: Phải sau thời điểm hiện tại }
       responses:
         '201':
           description: Created
@@ -494,13 +520,20 @@ paths:
                 allOf:
                   - $ref: '#/components/schemas/Envelope'
                   - properties:
-                      data: { $ref: '#/components/schemas/Hold' }
-        '409': { $ref: '#/components/responses/StockNotEnough' }
+                      data: { type: array, items: { $ref: '#/components/schemas/Hold' } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: STOCK_NOT_ENOUGH (thiếu khả dụng) hoặc CONFLICT (serial không có sẵn tại kho – details.serials; kho ngừng hoạt động / khóa kiểm kê)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
 
   /api/v1/holds/{id}/extend:
     patch:
       tags: [Holds]
-      summary: Gia hạn giữ hàng
+      summary: Gia hạn giữ hàng (SALES, MANAGER) – chỉ lượt giữ thủ công còn hiệu lực
       parameters: [{ $ref: '#/components/parameters/Id' }]
       requestBody:
         required: true
@@ -510,17 +543,31 @@ paths:
               type: object
               required: [expiresAt]
               properties:
-                expiresAt: { type: string, format: date-time }
+                expiresAt: { type: string, format: date-time, description: Phải sau hạn hiện tại và sau thời điểm hiện tại }
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200': { $ref: '#/components/responses/Hold' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Lượt giữ không còn hiệu lực, hoặc đang giữ cho chứng từ (thao tác trên chứng từ)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
 
   /api/v1/holds/{id}:
     delete:
       tags: [Holds]
-      summary: Nhả hàng đang giữ
+      summary: Nhả hàng đang giữ (SALES, STOREKEEPER, MANAGER) – chỉ lượt giữ thủ công
+      description: Trả lại tồn khả dụng, serial về AVAILABLE, status RELEASED. Giữ cho phiếu xuất / chuyển kho / thuê thì nhả qua chứng từ (409).
       parameters: [{ $ref: '#/components/parameters/Id' }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200': { $ref: '#/components/responses/Hold' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Lượt giữ không còn hiệu lực, hoặc đang giữ cho chứng từ
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
 
   # ------------------------------------------------------------------ Kiểm kê
   /api/v1/stocktakes:
@@ -1084,6 +1131,15 @@ components:
               - $ref: '#/components/schemas/Envelope'
               - properties:
                   data: { $ref: '#/components/schemas/Transfer' }
+    Hold:
+      description: OK
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Envelope'
+              - properties:
+                  data: { $ref: '#/components/schemas/Hold' }
     InternalResult:
       description: OK
       content:
@@ -1266,6 +1322,7 @@ components:
         id: { type: integer }
         productId: { type: integer }
         warehouseId: { type: integer }
+        warehouseName: { type: string }
         stockItemId: { type: integer, nullable: true }
         serial: { type: string, nullable: true }
         qty: { type: integer }

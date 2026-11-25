@@ -13,10 +13,18 @@ import com.microinvent.inventory.repository.ProductWarehouseSettingRepository;
 import com.microinvent.inventory.repository.StockBalanceRepository;
 import com.microinvent.inventory.repository.StockMovementRepository;
 import com.microinvent.inventory.repository.WarehouseRepository;
+import com.microinvent.common.context.UserContext;
+import com.microinvent.common.context.UserContextHolder;
+import com.microinvent.inventory.job.HoldExpiryJob;
+import com.microinvent.inventory.repository.StockHoldRepository;
+import com.microinvent.inventory.service.HoldService;
 import com.microinvent.inventory.service.InternalStockService;
+import com.microinvent.inventory.web.dto.HoldExtendRequest;
+import com.microinvent.inventory.web.dto.HoldRequest;
 import com.microinvent.inventory.web.dto.StockReceiveRequest;
 import com.microinvent.inventory.web.dto.StockReserveRequest;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -64,6 +72,8 @@ class InventoryIntegrationTest {
         r.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
         r.add("microinvent.internal.api-key", () -> "test-internal-key");
         r.add("eureka.client.enabled", () -> "false");
+        // Test gọi HoldExpiryJob.run() trực tiếp; không để lịch tự chạy chiếm khóa ShedLock giữa chừng.
+        r.add("microinvent.hold.expiry-initial-delay", () -> "1h");
     }
 
     /** Mỗi test dùng productId riêng để không ảnh hưởng nhau. */
@@ -72,6 +82,12 @@ class InventoryIntegrationTest {
 
     @Autowired
     InternalStockService stock;
+    @Autowired
+    HoldService holdService;
+    @Autowired
+    HoldExpiryJob expiryJob;
+    @Autowired
+    StockHoldRepository holdRepo;
     @Autowired
     WarehouseRepository warehouses;
     @Autowired
@@ -161,6 +177,60 @@ class InventoryIntegrationTest {
         assertThat(results).filteredOn(r -> !(r instanceof BusinessException)).hasSize(1);
         assertThat(balance(product).getQtyHold()).isEqualTo(2);
     }
+
+    @Test
+    void concurrentManualHoldsForLastUnitsOnlyOneWins() throws Exception {
+        int product = PRODUCT.getAndIncrement();
+        receive(product, 3, null);
+
+        List<Object> results = runConcurrently(2, i -> () -> {
+            UserContextHolder.set(ADMIN);
+            try {
+                return holdService.create(new HoldRequest(warehouseId, product, 3, null, null, "Khách " + i, null));
+            } finally {
+                UserContextHolder.clear();
+            }
+        });
+
+        assertThat(results).filteredOn(r -> !(r instanceof BusinessException)).hasSize(1);
+        assertThat(results).filteredOn(r -> r instanceof BusinessException)
+                .extracting(r -> ((BusinessException) r).getCode()).containsOnly(ErrorCode.STOCK_NOT_ENOUGH);
+        assertThat(balance(product).available()).isZero();
+    }
+
+    @Test
+    void expiryJobReleasesOverdueManualHoldsButNotExtendedOrDocumentHolds() {
+        int product = PRODUCT.getAndIncrement();
+        receive(product, 10, null);
+        UserContextHolder.set(ADMIN);
+        try {
+            Long overdue = holdService.create(new HoldRequest(warehouseId, product, 2, null, null, "A",
+                    LocalDateTime.now().plusSeconds(1))).get(0).id();
+            Long extended = holdService.create(new HoldRequest(warehouseId, product, 3, null, null, "B",
+                    LocalDateTime.now().plusSeconds(1))).get(0).id();
+            holdService.extend(extended, new HoldExtendRequest(LocalDateTime.now().plusDays(1)));
+            stock.reserve(reserve(product, 1, null)); // giữ cho phiếu xuất: không có hạn, không bị nhả
+            sleepQuietly(1500);
+
+            expiryJob.run();
+
+            assertThat(holdRepo.findById(overdue).orElseThrow().getStatus()).isEqualTo(StockHold.Status.EXPIRED);
+            assertThat(holdRepo.findById(extended).orElseThrow().getStatus()).isEqualTo(StockHold.Status.ACTIVE);
+            assertThat(balance(product).getQtyHold()).isEqualTo(4);
+        } finally {
+            UserContextHolder.clear();
+        }
+    }
+
+    private static void sleepQuietly(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static final UserContext ADMIN = new UserContext(1L, "admin", Set.of("ADMIN"), Set.of(), true, null);
 
     @Test
     void closeCheckAndLowStockQueriesRunOnRealSchema() {
