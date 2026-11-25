@@ -40,6 +40,9 @@ export type Receipt = {
   paymentStatus: ReceiptPaymentStatus
   note: string
   lines: ReceiptLine[]
+  createdAt: string
+  confirmedAt: string | null
+  cancelledAt: string | null
 }
 
 export type ReceiptInput = Omit<
@@ -52,6 +55,9 @@ export type ReceiptInput = Omit<
   | 'totalAmount'
   | 'paidAmount'
   | 'paymentStatus'
+  | 'createdAt'
+  | 'confirmedAt'
+  | 'cancelledAt'
 > & {
   status?: ReceiptStatus
 }
@@ -83,6 +89,9 @@ const initialReceipts: Receipt[] = [
     paidAmount: 0,
     paymentStatus: 'UNPAID',
     note: 'Kiểm tra tình trạng và serial khi nhập kho.',
+    createdAt: '2026-11-18T09:05:00',
+    confirmedAt: null,
+    cancelledAt: null,
     lines: [
       {
         productId: products[0].id,
@@ -119,6 +128,9 @@ const initialReceipts: Receipt[] = [
     paidAmount: 1_000_000,
     paymentStatus: 'PARTIAL',
     note: '',
+    createdAt: '2026-11-17T14:10:00',
+    confirmedAt: '2026-11-17T14:30:00',
+    cancelledAt: null,
     lines: [
       {
         productId: products[1].id,
@@ -161,6 +173,9 @@ export const useReceiptStore = create<ReceiptStore>((set, get) => ({
       status: input.status ?? 'DRAFT',
       paidAmount: 0,
       paymentStatus: 'UNPAID',
+      createdAt: new Date().toISOString(),
+      confirmedAt: input.status === 'CONFIRMED' ? new Date().toISOString() : null,
+      cancelledAt: null,
     }
     set((state) => ({ receipts: [receipt, ...state.receipts] }))
     return receipt
@@ -169,7 +184,7 @@ export const useReceiptStore = create<ReceiptStore>((set, get) => ({
     const totals = calculateTotals(input.lines, input.vatRate)
     set((state) => ({
       receipts: state.receipts.map((receipt) =>
-        receipt.id === id && receipt.status === 'DRAFT'
+        receipt.id === id && receipt.status !== 'CANCELLED'
           ? { ...receipt, ...input, ...totals }
           : receipt,
       ),
@@ -178,7 +193,14 @@ export const useReceiptStore = create<ReceiptStore>((set, get) => ({
   setStatus: (id, status) => {
     set((state) => ({
       receipts: state.receipts.map((receipt) =>
-        receipt.id === id ? { ...receipt, status } : receipt,
+        receipt.id === id
+          ? {
+              ...receipt,
+              status,
+              confirmedAt: status === 'CONFIRMED' ? new Date().toISOString() : receipt.confirmedAt,
+              cancelledAt: status === 'CANCELLED' ? new Date().toISOString() : receipt.cancelledAt,
+            }
+          : receipt,
       ),
     }))
   },

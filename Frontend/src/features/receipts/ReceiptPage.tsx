@@ -27,12 +27,20 @@ const paymentNames = {
   PAID: 'Đã thanh toán',
 } as const
 
-const localNow = new Date()
-localNow.setMinutes(localNow.getMinutes() - localNow.getTimezoneOffset())
-const defaultReceiptDate = localNow.toISOString().slice(0, 16)
+function currentLocalDateTime() {
+  const now = new Date()
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
+  return now.toISOString().slice(0, 16)
+}
+
 const money = (value: number) => `${value.toLocaleString('vi-VN')} đ`
-const dateTime = (value: string) =>
-  new Date(value).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })
+const dateTime = (value: string | null) => {
+  if (!value) return '—'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? '—'
+    : date.toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })
+}
 
 function ReceiptPage({ mode }: ReceiptPageProps) {
   const { id } = useParams()
@@ -40,7 +48,22 @@ function ReceiptPage({ mode }: ReceiptPageProps) {
   const receipt = id ? receipts.find((item) => item.id === Number(id)) : undefined
 
   if (mode === 'list') return <ReceiptListPage />
-  if (mode === 'form') return <ReceiptFormPage receipt={receipt} />
+  if (mode === 'form') {
+    if (id && !receipt) {
+      return (
+        <AppShell activePath="/receipts">
+          <div className="receipt-page">
+            <div className="receipt-not-found">
+              <h1>Không tìm thấy phiếu nhập</h1>
+              <p>Không thể sửa phiếu nhập vì phiếu này không tồn tại.</p>
+              <Link className="receipt-button receipt-button-primary" to="/receipts">Quay lại danh sách</Link>
+            </div>
+          </div>
+        </AppShell>
+      )
+    }
+    return <ReceiptFormPage key={receipt?.id ?? 'new'} receipt={receipt} />
+  }
   if (!receipt) {
     return (
       <AppShell activePath="/receipts">
@@ -185,7 +208,7 @@ function ReceiptFormPage({ receipt }: { receipt?: Receipt }) {
   const [warehouseId, setWarehouseId] = useState(String(receipt?.warehouseId ?? ''))
   const [supplierId, setSupplierId] = useState(String(receipt?.supplierId ?? ''))
   const [customerId, setCustomerId] = useState(String(receipt?.customerId ?? ''))
-  const [receiptDate, setReceiptDate] = useState(receipt?.receiptDate ?? defaultReceiptDate)
+  const [receiptDate, setReceiptDate] = useState(receipt?.receiptDate ?? currentLocalDateTime())
   const [contractNo, setContractNo] = useState(receipt?.contractNo ?? '')
   const [trackingNo, setTrackingNo] = useState(receipt?.trackingNo ?? '')
   const [bankPaymentRef, setBankPaymentRef] = useState(receipt?.bankPaymentRef ?? '')
@@ -193,8 +216,7 @@ function ReceiptFormPage({ receipt }: { receipt?: Receipt }) {
   const [note, setNote] = useState(receipt?.note ?? '')
   const [lines, setLines] = useState<ReceiptLine[]>(receipt?.lines ?? [createEmptyLine()])
   const [feedback, setFeedback] = useState('')
-  const [confirmAfterSave, setConfirmAfterSave] = useState(false)
-  const editable = !receipt || receipt.status === 'DRAFT'
+  const editable = !receipt || receipt.status !== 'CANCELLED'
   const subtotal = lines.reduce((sum, line) => sum + (Number(line.qty) || 0) * (Number(line.unitPrice) || 0), 0)
   const vatAmount = Math.round(subtotal * (vatRate === 'NONE' ? 0 : Number(vatRate))) / 100
 
@@ -220,6 +242,14 @@ function ReceiptFormPage({ receipt }: { receipt?: Receipt }) {
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!editable) return
+    const submitter = event.nativeEvent instanceof SubmitEvent
+      ? event.nativeEvent.submitter
+      : null
+    const confirmAfterSave = submitter instanceof HTMLButtonElement && submitter.value === 'confirm'
+    if (!receiptDate || Number.isNaN(new Date(receiptDate).getTime())) {
+      setFeedback('Vui lòng nhập ngày nhập hợp lệ.')
+      return
+    }
     if (!warehouseId) {
       setFeedback('Vui lòng chọn kho nhận.')
       return
@@ -271,6 +301,12 @@ function ReceiptFormPage({ receipt }: { receipt?: Receipt }) {
     if (!warehouse) {
       setFeedback('Kho nhận không hợp lệ.')
       return
+    }
+    if (confirmAfterSave || receipt?.status === 'CONFIRMED') {
+      const message = receipt?.status === 'CONFIRMED'
+        ? 'Lưu thay đổi phiếu đã xác nhận? Tồn kho sẽ được điều chỉnh theo các dòng hàng mới.'
+        : 'Xác nhận nhập kho? Hành động này sẽ cập nhật tồn kho.'
+      if (!window.confirm(message)) return
     }
     const supplier = receiptPartners.suppliers.find((item) => item.id === Number(supplierId))
     const customer = receiptPartners.customers.find((item) => item.id === Number(customerId))
@@ -326,6 +362,11 @@ function ReceiptFormPage({ receipt }: { receipt?: Receipt }) {
         </div>
 
         <form className="receipt-form" onSubmit={save}>
+          {receipt?.status === 'CONFIRMED' && (
+            <div className="receipt-edit-warning" role="note">
+              Sửa phiếu đã xác nhận sẽ điều chỉnh lại tồn kho. Bạn sẽ được hỏi xác nhận trước khi lưu.
+            </div>
+          )}
           <section className="receipt-form-card">
             <h2>Thông tin chung</h2>
             <div className="receipt-form-grid">
@@ -364,7 +405,7 @@ function ReceiptFormPage({ receipt }: { receipt?: Receipt }) {
               )}
               <label className="receipt-field">
                 <span>Ngày nhập</span>
-                <input disabled={!editable} onChange={(event) => setReceiptDate(event.target.value)} type="datetime-local" value={receiptDate} />
+                <input disabled={!editable} onChange={(event) => setReceiptDate(event.target.value)} required type="datetime-local" value={receiptDate} />
               </label>
               <label className="receipt-field">
                 <span>Số hợp đồng</span>
@@ -464,8 +505,8 @@ function ReceiptFormPage({ receipt }: { receipt?: Receipt }) {
           {feedback && <div className="receipt-feedback" role="alert">{feedback}</div>}
           <div className="receipt-form-actions">
             <Link className="receipt-button receipt-button-secondary" to="/receipts">Hủy</Link>
-            <button className="receipt-button receipt-button-secondary" onClick={() => setConfirmAfterSave(false)} type="submit">Lưu nháp</button>
-            <button className="receipt-button receipt-button-primary" onClick={() => setConfirmAfterSave(true)} type="submit">Xác nhận nhập</button>
+            <button className="receipt-button receipt-button-secondary" type="submit" value="draft">{receipt?.status === 'CONFIRMED' ? 'Lưu thay đổi' : 'Lưu nháp'}</button>
+            <button className="receipt-button receipt-button-primary" type="submit" value="confirm">{receipt?.status === 'CONFIRMED' ? 'Lưu & xác nhận' : 'Xác nhận nhập'}</button>
           </div>
         </form>
       </div>
@@ -511,14 +552,14 @@ function ReceiptDetailPage({ receipt }: { receipt: Receipt }) {
                 }
               }} type="button">Hủy phiếu</button>
             )}
-            {!confirmed && !cancelled && (
+            {!cancelled && (
               <>
                 <button className="receipt-button receipt-button-secondary" onClick={() => navigate(`/receipts/${receipt.id}/edit`)} type="button">Sửa</button>
-                <button className="receipt-button receipt-button-primary" onClick={() => {
+                {!confirmed && <button className="receipt-button receipt-button-primary" onClick={() => {
                   if (window.confirm('Xác nhận nhập kho? Hành động này sẽ cập nhật tồn kho.')) {
                     setStatus(receipt.id, 'CONFIRMED')
                   }
-                }} type="button">Xác nhận nhập</button>
+                }} type="button">Xác nhận nhập</button>}
               </>
             )}
           </div>
@@ -575,14 +616,22 @@ function ReceiptDetailPage({ receipt }: { receipt: Receipt }) {
             <section className="receipt-form-card">
               <h2>Lịch sử trạng thái</h2>
               <ol className="receipt-timeline">
-                <li className={confirmed ? 'is-done' : 'is-current'}>
-                  <strong>{confirmed ? 'Đã xác nhận' : statusNames[receipt.status]}</strong>
-                  <span>{dateTime(receipt.receiptDate)}</span>
-                </li>
-                <li className={confirmed ? 'is-current' : ''}>
+                <li className={receipt.status === 'DRAFT' ? 'is-current' : 'is-done'}>
                   <strong>Đã tạo phiếu</strong>
-                  <span>{dateTime(receipt.receiptDate)}</span>
+                  <span>{dateTime(receipt.createdAt)}</span>
                 </li>
+                {confirmed && (
+                  <li className="is-current">
+                    <strong>Đã xác nhận</strong>
+                    <span>{dateTime(receipt.confirmedAt)}</span>
+                  </li>
+                )}
+                {cancelled && (
+                  <li className="is-current">
+                    <strong>Đã hủy</strong>
+                    <span>{dateTime(receipt.cancelledAt)}</span>
+                  </li>
+                )}
               </ol>
             </section>
             <section className="receipt-form-card">
