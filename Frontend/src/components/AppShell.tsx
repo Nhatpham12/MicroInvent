@@ -10,7 +10,7 @@ const navigation = [
   { label: 'Khách hàng', icon: '♙', to: '/catalog/customers', enabled: true },
   { label: 'Danh mục kho', icon: '▧', to: '/warehouses', enabled: false },
   { label: 'Phiếu nhập', icon: '↓', to: '/receipts', enabled: true },
-  { label: 'Phiếu xuất', icon: '↑', to: '/exports', enabled: false },
+  { label: 'Phiếu xuất', icon: '↑', to: '/exports', enabled: true },
   { label: 'Chuyển kho', icon: '⇄', to: '/transfers', enabled: false },
   { label: 'Thuê / mượn', icon: '◷', to: '/rentals', enabled: false },
   { label: 'Kiểm kê', icon: '☷', to: '/stocktakes', enabled: false },
