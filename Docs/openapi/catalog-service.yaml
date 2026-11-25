@@ -1,0 +1,1328 @@
+# catalog-service – SINH TỰ ĐỘNG từ springdoc (GET /v3/api-docs của service, profile dev), 20/11/2026.
+# Sinh lại khi đổi API: chạy service rồi tải http://localhost:<port>/v3/api-docs, đổi servers về gateway.
+openapi: 3.1.0
+info:
+  title: MicroInvent – catalog-service
+  version: v1
+servers:
+- url: http://localhost:8080
+  description: api-gateway
+security:
+- bearerAuth: []
+paths:
+  /api/v1/suppliers/{id}:
+    get:
+      tags:
+      - Nhà cung cấp
+      summary: Chi tiết nhà cung cấp (ADMIN/MANAGER/ACCOUNTANT thấy đủ số tài khoản)
+      operationId: get
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseSupplierResponse'
+    put:
+      tags:
+      - Nhà cung cấp
+      summary: Sửa nhà cung cấp (không đổi mã; bankAccountNo null = giữ nguyên)
+      operationId: update
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupplierRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseSupplierResponse'
+    delete:
+      tags:
+      - Nhà cung cấp
+      summary: Xóa mềm nhà cung cấp
+      operationId: delete
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+  /api/v1/products/{id}:
+    get:
+      tags:
+      - Sản phẩm
+      summary: Chi tiết sản phẩm
+      operationId: get_1
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseProductResponse'
+    put:
+      tags:
+      - Sản phẩm
+      summary: Sửa sản phẩm (không đổi mã)
+      operationId: update_1
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseProductResponse'
+    delete:
+      tags:
+      - Sản phẩm
+      summary: Xóa mềm sản phẩm
+      operationId: delete_1
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+  /api/v1/product-groups/{id}:
+    put:
+      tags:
+      - Nhóm sản phẩm
+      summary: Sửa nhóm sản phẩm (không đổi mã)
+      operationId: update_2
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductGroupRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseProductGroupResponse'
+    delete:
+      tags:
+      - Nhóm sản phẩm
+      summary: Xóa mềm nhóm sản phẩm (chặn nếu còn sản phẩm)
+      operationId: delete_2
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+  /api/v1/customers/{id}:
+    get:
+      tags:
+      - Khách hàng
+      summary: Chi tiết khách hàng (ADMIN/MANAGER/ACCOUNTANT thấy đủ CCCD)
+      operationId: get_2
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseCustomerResponse'
+    put:
+      tags:
+      - Khách hàng
+      summary: Sửa khách hàng (không đổi mã; idCardNo null = giữ nguyên)
+      operationId: update_3
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseCustomerResponse'
+    delete:
+      tags:
+      - Khách hàng
+      summary: Xóa mềm khách hàng
+      operationId: delete_3
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+  /internal/products/batch:
+    post:
+      tags:
+      - Nội bộ – catalog
+      summary: Lấy nhiều sản phẩm theo danh sách id (kể cả đã xóa mềm) để chụp snapshot chứng từ
+      operationId: products
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductBatchRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseProductBatchResponse'
+  /internal/partners/batch:
+    post:
+      tags:
+      - Nội bộ – catalog
+      summary: Lấy nhà cung cấp / khách hàng theo danh sách id (kể cả đã xóa mềm)
+      operationId: partners
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerBatchRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponsePartnerBatchResponse'
+  /api/v1/suppliers:
+    get:
+      tags:
+      - Nhà cung cấp
+      summary: 'Danh sách nhà cung cấp: tìm theo mã/tên/MST/SĐT, sắp xếp, phân trang'
+      description: sort=name,asc | code | taxCode | createdAt | updatedAt. Số tài khoản luôn bị che.
+      operationId: list
+      parameters:
+      - name: keyword
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponsePageResponseSupplierResponse'
+    post:
+      tags:
+      - Nhà cung cấp
+      summary: Tạo nhà cung cấp (mã bỏ trống thì tự sinh; số tài khoản được mã hóa)
+      operationId: create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupplierRequest'
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseSupplierResponse'
+  /api/v1/products:
+    get:
+      tags:
+      - Sản phẩm
+      summary: 'Danh sách sản phẩm: tìm theo mã/tên, lọc nhóm/giá bán/serial, sắp xếp, phân trang'
+      description: sort=name,asc | code | defaultPriceOut | defaultPriceIn | createdAt | updatedAt
+      operationId: list_1
+      parameters:
+      - name: keyword
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: groupId
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+      - name: minPrice
+        in: query
+        required: false
+        schema:
+          type: number
+      - name: maxPrice
+        in: query
+        required: false
+        schema:
+          type: number
+      - name: hasSerial
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponsePageResponseProductResponse'
+    post:
+      tags:
+      - Sản phẩm
+      summary: Tạo sản phẩm
+      operationId: create_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseProductResponse'
+  /api/v1/products/{id}/image:
+    post:
+      tags:
+      - Sản phẩm
+      summary: Upload ảnh sản phẩm (PNG/JPEG/WEBP, tối đa 2 MB), trả imageUrl mới
+      description: multipart/form-data, field 'file'. Ảnh cũ bị xóa sau khi lưu thành công.
+      operationId: uploadImage
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseMapStringString'
+  /api/v1/products/import:
+    post:
+      tags:
+      - Sản phẩm
+      summary: 'Nhập sản phẩm từ .xlsx: mã mới thì tạo, mã đã có thì cập nhật'
+      description: Một dòng lỗi là không lưu dòng nào; lỗi trả trong error.details.errors theo số dòng.
+      operationId: importFile
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseProductImportResult'
+  /api/v1/product-groups:
+    get:
+      tags:
+      - Nhóm sản phẩm
+      summary: Danh sách nhóm sản phẩm (kèm số sản phẩm)
+      operationId: list_2
+      parameters:
+      - name: keyword
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseListProductGroupResponse'
+    post:
+      tags:
+      - Nhóm sản phẩm
+      summary: Tạo nhóm sản phẩm
+      operationId: create_2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductGroupRequest'
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseProductGroupResponse'
+  /api/v1/customers:
+    get:
+      tags:
+      - Khách hàng
+      summary: 'Danh sách khách hàng: tìm theo mã/tên/SĐT/MST, lọc loại khách, phân trang'
+      description: sort=name,asc | code | phone | createdAt | updatedAt. CCCD luôn bị che.
+      operationId: list_3
+      parameters:
+      - name: keyword
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: customerType
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - RETAIL
+          - BUSINESS
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponsePageResponseCustomerResponse'
+    post:
+      tags:
+      - Khách hàng
+      summary: Tạo khách hàng (mã bỏ trống thì tự sinh; CCCD được mã hóa)
+      operationId: create_3
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerRequest'
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseCustomerResponse'
+  /health:
+    get:
+      tags:
+      - health-controller
+      operationId: health
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseMapStringObject'
+  /api/v1/products/{id}/image/{fileName}:
+    get:
+      tags:
+      - Sản phẩm
+      summary: Tải ảnh sản phẩm (đường dẫn lấy từ imageUrl)
+      description: 'Cần đăng nhập: FE gọi bằng fetch kèm token rồi hiển thị qua URL.createObjectURL.'
+      operationId: image
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - name: fileName
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+  /api/v1/products/import/template:
+    get:
+      tags:
+      - Sản phẩm
+      summary: Tải file mẫu nhập sản phẩm (.xlsx)
+      operationId: importTemplate
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+  /api/v1/products/export:
+    get:
+      tags:
+      - Sản phẩm
+      summary: Xuất danh sách sản phẩm ra .xlsx (cùng bộ lọc với danh sách, tối đa 10.000 dòng)
+      operationId: export
+      parameters:
+      - name: keyword
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: groupId
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+      - name: minPrice
+        in: query
+        required: false
+        schema:
+          type: number
+      - name: maxPrice
+        in: query
+        required: false
+        schema:
+          type: number
+      - name: hasSerial
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+components:
+  schemas:
+    SupplierRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          maxLength: 30
+          minLength: 0
+          pattern: ^[A-Za-z0-9_.\-]*$
+        name:
+          type: string
+          maxLength: 255
+          minLength: 0
+        taxCode:
+          type: string
+          minLength: 1
+          pattern: ^\d{10}(-\d{3})?$
+        address:
+          type: string
+          maxLength: 255
+          minLength: 0
+        phoneFax:
+          type: string
+          maxLength: 50
+          minLength: 0
+          pattern: ^[0-9+()\-./ ]*$
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          minLength: 0
+        bankAccountNo:
+          type: string
+          pattern: ^[0-9 .\-]{0,30}$
+        bankAccountName:
+          type: string
+          maxLength: 100
+          minLength: 0
+        bankName:
+          type: string
+          maxLength: 100
+          minLength: 0
+        note:
+          type: string
+          maxLength: 5000
+          minLength: 0
+      required:
+      - name
+      - taxCode
+    ApiError:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details: {}
+    ApiResponseSupplierResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/SupplierResponse'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    SupplierResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        code:
+          type: string
+        name:
+          type: string
+        taxCode:
+          type: string
+        address:
+          type: string
+        phoneFax:
+          type: string
+        email:
+          type: string
+        bankAccountNo:
+          type: string
+        bankAccountMasked:
+          type: boolean
+        bankAccountName:
+          type: string
+        bankName:
+          type: string
+        note:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ProductRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          maxLength: 50
+          minLength: 0
+          pattern: ^[A-Za-z0-9_.\-]+$
+        name:
+          type: string
+          maxLength: 255
+          minLength: 0
+        groupId:
+          type: integer
+          format: int32
+        unit:
+          type: string
+          maxLength: 20
+          minLength: 0
+        defaultPriceIn:
+          type: number
+          minimum: 0
+        defaultPriceOut:
+          type: number
+          minimum: 0
+        defaultRentPricePerDay:
+          type: number
+          minimum: 0
+        minStock:
+          type: integer
+          format: int32
+        hasSerial:
+          type: boolean
+        warrantyMonths:
+          type: integer
+          format: int32
+          maximum: 240
+        description:
+          type: string
+          maxLength: 5000
+          minLength: 0
+      required:
+      - code
+      - groupId
+      - name
+      - unit
+    ApiResponseProductResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/ProductResponse'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    ProductResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        code:
+          type: string
+        name:
+          type: string
+        groupId:
+          type: integer
+          format: int32
+        groupCode:
+          type: string
+        groupName:
+          type: string
+        unit:
+          type: string
+        defaultPriceIn:
+          type: number
+        defaultPriceOut:
+          type: number
+        defaultRentPricePerDay:
+          type: number
+        minStock:
+          type: integer
+          format: int32
+        hasSerial:
+          type: boolean
+        warrantyMonths:
+          type: integer
+          format: int32
+        imageUrl:
+          type: string
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ProductGroupRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          maxLength: 50
+          minLength: 0
+          pattern: ^[A-Za-z0-9_\-]+$
+        name:
+          type: string
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          maxLength: 255
+          minLength: 0
+      required:
+      - code
+      - name
+    ApiResponseProductGroupResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/ProductGroupResponse'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    ProductGroupResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        productCount:
+          type: integer
+          format: int64
+    CustomerRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          maxLength: 30
+          minLength: 0
+          pattern: ^[A-Za-z0-9_.\-]*$
+        name:
+          type: string
+          maxLength: 255
+          minLength: 0
+        customerType:
+          type: string
+          enum:
+          - RETAIL
+          - BUSINESS
+        taxCode:
+          type: string
+          pattern: ^(\d{10}(-\d{3})?)?$
+        idCardNo:
+          type: string
+          pattern: ^[0-9 .\-]{0,20}$
+        address:
+          type: string
+          maxLength: 255
+          minLength: 0
+        phone:
+          type: string
+          pattern: ^((\+84|0)\d{9,10})?$
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          minLength: 0
+        note:
+          type: string
+          maxLength: 5000
+          minLength: 0
+      required:
+      - name
+    ApiResponseCustomerResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/CustomerResponse'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    CustomerResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        code:
+          type: string
+        name:
+          type: string
+        customerType:
+          type: string
+          enum:
+          - RETAIL
+          - BUSINESS
+        taxCode:
+          type: string
+        idCardNo:
+          type: string
+        idCardMasked:
+          type: boolean
+        address:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        note:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ProductBatchRequest:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: integer
+            format: int32
+          maxItems: 500
+          minItems: 0
+      required:
+      - ids
+    ApiResponseProductBatchResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/ProductBatchResponse'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    ProductBatchResponse:
+      type: object
+      properties:
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductSnapshot'
+        notFound:
+          type: array
+          items:
+            type: integer
+            format: int32
+    ProductSnapshot:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        code:
+          type: string
+        name:
+          type: string
+        unit:
+          type: string
+        groupId:
+          type: integer
+          format: int32
+        groupCode:
+          type: string
+        groupName:
+          type: string
+        defaultPriceIn:
+          type: number
+        defaultPriceOut:
+          type: number
+        defaultRentPricePerDay:
+          type: number
+        minStock:
+          type: integer
+          format: int32
+        hasSerial:
+          type: boolean
+        warrantyMonths:
+          type: integer
+          format: int32
+        deleted:
+          type: boolean
+    PartnerBatchRequest:
+      type: object
+      properties:
+        supplierIds:
+          type: array
+          items:
+            type: integer
+            format: int32
+          maxItems: 500
+          minItems: 0
+        customerIds:
+          type: array
+          items:
+            type: integer
+            format: int32
+          maxItems: 500
+          minItems: 0
+    ApiResponsePartnerBatchResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/PartnerBatchResponse'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    CustomerSnapshot:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        code:
+          type: string
+        name:
+          type: string
+        customerType:
+          type: string
+        taxCode:
+          type: string
+        address:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        deleted:
+          type: boolean
+    PartnerBatchResponse:
+      type: object
+      properties:
+        suppliers:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupplierSnapshot'
+        customers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomerSnapshot'
+        supplierIdsNotFound:
+          type: array
+          items:
+            type: integer
+            format: int32
+        customerIdsNotFound:
+          type: array
+          items:
+            type: integer
+            format: int32
+    SupplierSnapshot:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        code:
+          type: string
+        name:
+          type: string
+        taxCode:
+          type: string
+        address:
+          type: string
+        phoneFax:
+          type: string
+        email:
+          type: string
+        deleted:
+          type: boolean
+    ApiResponseMapStringString:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          additionalProperties:
+            type: string
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    ApiResponseProductImportResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/ProductImportResult'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    ProductImportResult:
+      type: object
+      properties:
+        totalRows:
+          type: integer
+          format: int32
+        created:
+          type: integer
+          format: int32
+        updated:
+          type: integer
+          format: int32
+    ApiResponseMapStringObject:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          additionalProperties: {}
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    ApiResponsePageResponseSupplierResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/PageResponseSupplierResponse'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    PageResponseSupplierResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupplierResponse'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    ApiResponsePageResponseProductResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/PageResponseProductResponse'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    PageResponseProductResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductResponse'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    ApiResponseListProductGroupResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductGroupResponse'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    ApiResponsePageResponseCustomerResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/PageResponseCustomerResponse'
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+    PageResponseCustomerResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomerResponse'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    ApiResponseVoid:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data: {}
+        meta: {}
+        error:
+          $ref: '#/components/schemas/ApiError'
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

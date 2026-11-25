@@ -13,6 +13,7 @@ import com.microinvent.common.web.PageResponse;
 import jakarta.persistence.criteria.Predicate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -32,10 +33,12 @@ public class SupplierService {
 
     private final SupplierRepository repository;
     private final FieldEncryptor encryptor;
+    private final CatalogAudit audit;
 
-    public SupplierService(SupplierRepository repository, FieldEncryptor encryptor) {
+    public SupplierService(SupplierRepository repository, FieldEncryptor encryptor, CatalogAudit audit) {
         this.repository = repository;
         this.encryptor = encryptor;
+        this.audit = audit;
     }
 
     /** @param keyword tìm theo mã, tên, mã số thuế, SĐT */
@@ -68,6 +71,7 @@ public class SupplierService {
         if (code == null) {
             saved.setCode(PartnerCodes.fromId("NCC", saved.getId(), repository::existsByCodeIgnoreCase));
         }
+        audit.record("CREATE", "SUPPLIER", saved.getId(), null, snapshot(saved));
         return toResponse(saved, true);
     }
 
@@ -76,12 +80,22 @@ public class SupplierService {
         if (repository.existsByTaxCodeAndIdNot(req.taxCode().trim(), id)) {
             throw new BusinessException(ErrorCode.CONFLICT, "Mã số thuế đã được dùng cho nhà cung cấp khác");
         }
+        Map<String, Object> before = snapshot(s);
         apply(s, req, false);
+        audit.record("UPDATE", "SUPPLIER", id, before, snapshot(s));
         return toResponse(s, true);
     }
 
     public void delete(Integer id) {
-        find(id).setDeleted(true);
+        Supplier s = find(id);
+        s.setDeleted(true);
+        audit.record("DELETE", "SUPPLIER", id, snapshot(s), null);
+    }
+
+    /** Trường ghi nhật ký – không có STK / CCCD. */
+    private static Map<String, Object> snapshot(Supplier s) {
+        return CatalogAudit.snapshot("code", s.getCode(), "name", s.getName(), "taxCode", s.getTaxCode(),
+                "phoneFax", s.getPhoneFax());
     }
 
     private Supplier find(Integer id) {

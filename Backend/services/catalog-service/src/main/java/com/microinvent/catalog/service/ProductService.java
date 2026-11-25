@@ -30,10 +30,12 @@ public class ProductService {
 
     private final ProductRepository products;
     private final ProductGroupRepository groups;
+    private final CatalogAudit audit;
 
-    public ProductService(ProductRepository products, ProductGroupRepository groups) {
+    public ProductService(ProductRepository products, ProductGroupRepository groups, CatalogAudit audit) {
         this.products = products;
         this.groups = groups;
+        this.audit = audit;
     }
 
     /**
@@ -66,17 +68,24 @@ public class ProductService {
         Product p = new Product();
         p.setCode(code);
         apply(p, req);
-        return toResponse(products.save(p));
+        ProductResponse res = toResponse(products.save(p));
+        audit.record("CREATE", "PRODUCT", res.id(), null, res);
+        return res;
     }
 
     public ProductResponse update(Integer id, ProductRequest req) {
         Product p = find(id);
+        ProductResponse before = toResponse(p);
         apply(p, req);
-        return toResponse(p);
+        ProductResponse res = toResponse(p);
+        audit.record("UPDATE", "PRODUCT", id, before, res);
+        return res;
     }
 
     public void delete(Integer id) {
-        find(id).setDeleted(true);
+        Product p = find(id);
+        p.setDeleted(true);
+        audit.record("DELETE", "PRODUCT", id, CatalogAudit.snapshot("code", p.getCode(), "name", p.getName()), null);
     }
 
     private Product find(Integer id) {

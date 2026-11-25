@@ -26,6 +26,8 @@ import org.junit.jupiter.api.Test;
 
 class SupplierServiceTest {
 
+    private final CatalogAudit audit = org.mockito.Mockito.mock(CatalogAudit.class);
+
     private SupplierRepository repo;
     private FieldEncryptor enc;
     private SupplierService service;
@@ -34,7 +36,7 @@ class SupplierServiceTest {
     void setUp() {
         repo = mock(SupplierRepository.class);
         enc = new FieldEncryptor(FieldEncryptorTest.KEY);
-        service = new SupplierService(repo, enc);
+        service = new SupplierService(repo, enc, audit);
         when(repo.saveAndFlush(any())).thenAnswer(inv -> {
             Supplier s = inv.getArgument(0);
             s.setId(7);
@@ -74,6 +76,11 @@ class SupplierServiceTest {
         assertThat(res.note()).isNull();
         assertThat(res.bankAccountNo()).isEqualTo("0123456789");
         assertThat(res.bankAccountMasked()).isFalse();
+        // Nhật ký không chứa STK (GAP-01)
+        org.mockito.ArgumentCaptor<Object> after = org.mockito.ArgumentCaptor.forClass(Object.class);
+        verify(audit).record(org.mockito.ArgumentMatchers.eq("CREATE"), org.mockito.ArgumentMatchers.eq("SUPPLIER"),
+                org.mockito.ArgumentMatchers.eq(7), org.mockito.ArgumentMatchers.isNull(), after.capture());
+        assertThat(after.getValue().toString()).contains("NCC00007").doesNotContain("0123456789");
     }
 
     @Test

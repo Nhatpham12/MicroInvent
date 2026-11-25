@@ -12,6 +12,7 @@ import com.microinvent.common.web.PageResponse;
 import jakarta.persistence.criteria.Predicate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -28,10 +29,12 @@ public class CustomerService {
 
     private final CustomerRepository repository;
     private final FieldEncryptor encryptor;
+    private final CatalogAudit audit;
 
-    public CustomerService(CustomerRepository repository, FieldEncryptor encryptor) {
+    public CustomerService(CustomerRepository repository, FieldEncryptor encryptor, CatalogAudit audit) {
         this.repository = repository;
         this.encryptor = encryptor;
+        this.audit = audit;
     }
 
     /** @param keyword tìm theo mã, tên, SĐT, mã số thuế */
@@ -64,6 +67,7 @@ public class CustomerService {
         if (code == null) {
             saved.setCode(PartnerCodes.fromId("KH", saved.getId(), repository::existsByCodeIgnoreCase));
         }
+        audit.record("CREATE", "CUSTOMER", saved.getId(), null, snapshot(saved));
         return toResponse(saved, true);
     }
 
@@ -73,12 +77,22 @@ public class CustomerService {
         if (taxCode != null && repository.existsByTaxCodeAndDeletedFalseAndIdNot(taxCode, id)) {
             throw new BusinessException(ErrorCode.CONFLICT, "Mã số thuế đã được dùng cho khách hàng khác");
         }
+        Map<String, Object> before = snapshot(c);
         apply(c, req, false);
+        audit.record("UPDATE", "CUSTOMER", id, before, snapshot(c));
         return toResponse(c, true);
     }
 
     public void delete(Integer id) {
-        find(id).setDeleted(true);
+        Customer c = find(id);
+        c.setDeleted(true);
+        audit.record("DELETE", "CUSTOMER", id, snapshot(c), null);
+    }
+
+    /** Trường ghi nhật ký – không có STK / CCCD. */
+    private static Map<String, Object> snapshot(Customer c) {
+        return CatalogAudit.snapshot("code", c.getCode(), "name", c.getName(), "taxCode", c.getTaxCode(),
+                "phone", c.getPhone());
     }
 
     private Customer find(Integer id) {

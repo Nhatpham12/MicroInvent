@@ -42,12 +42,14 @@ public class ProductImageService {
     private final ProductRepository products;
     private final CatalogProperties props;
     private final String defaultTenant;
+    private final CatalogAudit audit;
 
     public ProductImageService(ProductRepository products, CatalogProperties props,
-            @Value("${microinvent.tenant.default-tenant:tigernet}") String defaultTenant) {
+            @Value("${microinvent.tenant.default-tenant:tigernet}") String defaultTenant, CatalogAudit audit) {
         this.products = products;
         this.props = props;
         this.defaultTenant = defaultTenant;
+        this.audit = audit;
     }
 
     /** Ảnh đã lưu: đường dẫn file + kiểu nội dung. */
@@ -71,8 +73,12 @@ public class ProductImageService {
         }
     }
 
+    /**
+     * Khóa dòng sản phẩm trong lúc upload: upload song song cho cùng sản phẩm chạy lần lượt, mỗi lần xóa đúng ảnh
+     * của lần trước nên không còn file mồ côi trên đĩa.
+     */
     public String upload(Integer productId, MultipartFile file) {
-        Product p = products.findByIdAndDeletedFalse(productId)
+        Product p = products.findForUpdateByIdAndDeletedFalse(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Không tìm thấy sản phẩm"));
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ErrorCode.FILE_INVALID, "Vui lòng chọn ảnh");
@@ -109,6 +115,8 @@ public class ProductImageService {
         String oldUrl = p.getImageUrl();
         String url = "/api/v1/products/" + productId + "/image/" + fileName;
         p.setImageUrl(url);
+        audit.record("UPLOAD_IMAGE", "PRODUCT", productId, CatalogAudit.snapshot("imageUrl", oldUrl),
+                CatalogAudit.snapshot("imageUrl", url));
         // Xóa ảnh cũ sau khi commit; rollback thì xóa ảnh mới để không để rác.
         afterCompletion(committed -> deleteQuietly(committed ? fileNameOf(oldUrl) : fileName, dir));
         return url;

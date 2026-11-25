@@ -4,11 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.microinvent.common.exception.BusinessException;
 import com.microinvent.common.exception.ErrorCode;
+import com.microinvent.common.web.ApiResponse;
+import com.microinvent.identity.client.InventoryClient;
 import com.microinvent.identity.domain.Role;
 import com.microinvent.identity.domain.User;
 import com.microinvent.identity.domain.UserWarehouse;
@@ -45,6 +48,7 @@ class UserServiceTest {
     private RefreshTokenRepository refreshTokens;
     private LoginHistoryRepository histories;
     private UserScopeService scope;
+    private InventoryClient inventory;
     private UserService service;
     private Role admin;
     private Role storekeeper;
@@ -57,8 +61,10 @@ class UserServiceTest {
         refreshTokens = mock(RefreshTokenRepository.class);
         histories = mock(LoginHistoryRepository.class);
         scope = mock(UserScopeService.class);
+        inventory = mock(InventoryClient.class);
+        when(inventory.exists(any())).thenReturn(ApiResponse.ok(new InventoryClient.WarehouseExists(List.of(), List.of())));
         service = new UserService(users, roles, refreshTokens, histories, scope, mock(PasswordService.class),
-                new BCryptPasswordEncoder(4), CLOCK);
+                new BCryptPasswordEncoder(4), new WarehouseValidator(inventory), CLOCK);
 
         admin = role("ADMIN", true);
         storekeeper = role("STOREKEEPER", false);
@@ -170,6 +176,44 @@ class UserServiceTest {
         assertThat(service.changeDefaultWarehouse(5, 1).defaultWarehouseId()).isEqualTo(1);
         target.setRole(admin);
         assertThat(service.changeDefaultWarehouse(5, 9).defaultWarehouseId()).isEqualTo(9);
+    }
+
+    @Test
+    void assigningUnknownOrClosedWarehouseIsRejected() {
+        when(inventory.exists(new InventoryClient.WarehouseIds(List.of(987654))))
+                .thenReturn(ApiResponse.ok(new InventoryClient.WarehouseExists(List.of(987654), List.of())));
+        assertThat(code(() -> service.assignWarehouses(5,
+                new AssignWarehousesRequest(List.of(new WarehouseAccessRequest(987654, true)), 987654))))
+                .isEqualTo(ErrorCode.BAD_REQUEST);
+        assertThat(target.getWarehouses()).isEmpty();
+
+        when(inventory.exists(new InventoryClient.WarehouseIds(List.of(4))))
+                .thenReturn(ApiResponse.ok(new InventoryClient.WarehouseExists(List.of(), List.of(4))));
+        assertThat(code(() -> service.create(createReq(List.of(new WarehouseAccessRequest(4, true)), 4))))
+                .isEqualTo(ErrorCode.BAD_REQUEST);
+        verify(users, never()).save(any());
+    }
+
+    @Test
+    void adminDefaultWarehouseMustExist() {
+        target.setRole(admin);
+        when(inventory.exists(new InventoryClient.WarehouseIds(List.of(555555))))
+                .thenReturn(ApiResponse.ok(new InventoryClient.WarehouseExists(List.of(555555), List.of())));
+        assertThat(code(() -> service.changeDefaultWarehouse(5, 555555))).isEqualTo(ErrorCode.BAD_REQUEST);
+        assertThat(target.getDefaultWarehouseId()).isNull();
+    }
+
+    @Test
+    void inventoryDownIsServiceUnavailable() {
+        when(inventory.exists(any())).thenThrow(mock(feign.RetryableException.class));
+        assertThat(code(() -> service.assignWarehouses(5,
+                new AssignWarehousesRequest(List.of(new WarehouseAccessRequest(1, true)), 1))))
+                .isEqualTo(ErrorCode.SERVICE_UNAVAILABLE);
+    }
+
+    @Test
+    void accessStatsDefaultsToCurrentYearFromClock() {
+        assertThat(service.accessStats(null).year()).isEqualTo(2026);
     }
 
     @Test

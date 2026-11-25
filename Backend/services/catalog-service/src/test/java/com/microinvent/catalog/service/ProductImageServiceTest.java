@@ -1,7 +1,10 @@
 package com.microinvent.catalog.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.microinvent.catalog.config.CatalogProperties;
@@ -23,6 +26,8 @@ import org.springframework.util.unit.DataSize;
 
 class ProductImageServiceTest {
 
+    private final CatalogAudit audit = org.mockito.Mockito.mock(CatalogAudit.class);
+
     static final byte[] PNG = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0, 1, 2, 3};
 
     @TempDir
@@ -36,10 +41,10 @@ class ProductImageServiceTest {
     void setUp() {
         products = mock(ProductRepository.class);
         service = new ProductImageService(products,
-                new CatalogProperties("k", dir.toString(), DataSize.ofKilobytes(1), null, null), "tigernet");
+                new CatalogProperties("k", dir.toString(), DataSize.ofKilobytes(1), null, null), "tigernet", audit);
         product = new Product();
         product.setId(5);
-        when(products.findByIdAndDeletedFalse(5)).thenReturn(Optional.of(product));
+        when(products.findForUpdateByIdAndDeletedFalse(5)).thenReturn(Optional.of(product));
         TenantContext.set("acme");
     }
 
@@ -71,6 +76,8 @@ class ProductImageServiceTest {
         ProductImageService.StoredImage img = service.load(5, second.substring(second.lastIndexOf('/') + 1));
         assertThat(img.mediaType()).isEqualTo(MediaType.IMAGE_PNG);
         assertThat(Files.readAllBytes(img.path())).isEqualTo(PNG);
+        // Upload luôn khóa dòng sản phẩm (BUG-07: upload song song không để file mồ côi)
+        verify(products, never()).findByIdAndDeletedFalse(any());
     }
 
     @Test

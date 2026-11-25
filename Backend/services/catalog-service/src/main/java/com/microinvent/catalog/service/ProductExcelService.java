@@ -63,13 +63,15 @@ public class ProductExcelService {
     private final ProductGroupRepository groups;
     private final Validator validator;
     private final CatalogProperties props;
+    private final CatalogAudit audit;
 
     public ProductExcelService(ProductRepository products, ProductGroupRepository groups, Validator validator,
-            CatalogProperties props) {
+            CatalogProperties props, CatalogAudit audit) {
         this.products = products;
         this.groups = groups;
         this.validator = validator;
         this.props = props;
+        this.audit = audit;
     }
 
     // ---------------------------------------------------------------- xuất
@@ -272,6 +274,8 @@ public class ProductExcelService {
             toSave.add(p);
         }
         products.saveAll(toSave);
+        audit.record("IMPORT", "PRODUCT", null, null, CatalogAudit.snapshot("totalRows", rows.size(),
+                "created", created, "updated", updated, "codes", toSave.stream().map(Product::getCode).toList()));
         return new ProductImportResult(rows.size(), created, updated);
     }
 

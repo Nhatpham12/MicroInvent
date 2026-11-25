@@ -1,6 +1,12 @@
 # CHỈ CHO MÁY DEV (--spring.profiles.active=dev). Không bao giờ bật profile này trên môi trường thật.
 # Bật profile này sẽ: dùng khóa dev mặc định (nếu chưa đặt biến môi trường) và nạp thêm tài khoản demo
 # (db/dev-seed) cho mọi tenant.
+spring:
+  mail:
+    # Mailpit không cần đăng nhập
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+
 microinvent:
   tenant:
     migration-locations:

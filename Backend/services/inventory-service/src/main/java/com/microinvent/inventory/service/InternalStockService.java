@@ -142,7 +142,11 @@ public class InternalStockService {
      * Đảo một lần receive khi sửa / hủy phiếu nhập đã xác nhận (SRS 3.3.1) – nhận đúng body đã gửi cho receive.
      * Chặn (409) nếu: đảo nhiều hơn số còn lại của chứng từ, hàng đã bị giữ / xuất (không đủ khả dụng), hoặc
      * serial đã rời kho / từng được giữ cho chứng từ khác. Kiểm hết các dòng rồi mới trừ.
+     * <p>
+     * READ COMMITTED: số còn lại của chứng từ ({@code netQtyOfRef}) đọc sau khi chờ khóa dòng tồn, phải thấy lần đảo
+     * mà request song song vừa commit – REPEATABLE READ đọc snapshot cũ nên 2 request cùng chứng từ đều đảo được.
      */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public StockResult reverse(StockReceiveRequest req) {
         if (!RECEIVE_REF_TYPES.contains(req.refType())) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, ErrorCode.VALIDATION_ERROR.defaultMessage(),
